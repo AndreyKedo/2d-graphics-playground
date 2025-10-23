@@ -1,101 +1,49 @@
-import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
-import 'package:vector_math/vector_math_64.dart' as vm;
+import 'package:graphics_playground/graphics_viewport/gesture.dart';
+import 'package:graphics_playground/graphics_viewport/viewport.dart';
 
-extension type const Gesture._(int val) {
-  static const Gesture none = Gesture._(0);
+class GraphicsViewportController {
+  WeakReference<GraphicsViewportRenderObject>? _renderObject;
 
-  static const Gesture down = Gesture._(1);
-  static const Gesture up = Gesture._(2);
-  static const Gesture move = Gesture._(3);
-
-  Gesture compose(Gesture other) => Gesture._(val | other.val);
-
-  bool get isMoving {
-    return _bit(down.val) && _bit(move.val);
+  void _useObject(void Function(GraphicsViewportRenderObject object) callback) {
+    if (_renderObject?.target case GraphicsViewportRenderObject object) {
+      callback(object);
+    }
   }
 
-  bool _bit(int bit) => (val & bit) != 0;
-
-  Gesture operator +(Gesture other) => compose(other);
-}
-
-class Viewport {
-  late vm.Matrix4 _matrix = _initialMatrix();
-
-  Offset _position = Offset.zero;
-  double _scale = 1.0;
-
-  vm.Matrix4 get matrix => _matrix.clone();
-
-  Float64List get rawMatrix => _matrix.storage;
-
-  vm.Matrix4 _initialMatrix() {
-    return vm.Matrix4.translation(vm.Vector3(.0, .0, 0))
-      // Отражение по оси Y
-      ..scaleByVector3(vm.Vector3(1, -1, 1));
-  }
-
-  void translate(Offset delta) {
-    _position += delta;
-    _updateMatrix();
-  }
-
-  void scale(double scale, [Offset? focalPoint]) {
-    _scale *= scale;
-    _scale = _scale.clamp(1, 10.0) / 10; // Ограничения масштаба
-    _updateMatrix();
-  }
-
-  @pragma('vm:prefer-inline')
-  void _updateMatrix() {
-    _matrix = vm.Matrix4.translation(vm.Vector3(_position.dx, _position.dy, 0))
-      ..scaleByVector3(vm.Vector3(1, -1, 1))
-      ..scaleByVector3(vm.Vector3.all(_scale));
-  }
-
-  Rect getWorldRect(Size size) {
-    // Преобразуем углы экрана в мировые координаты
-    final topLeft = screenToWorld(Offset.zero, size);
-    final bottomRight = screenToWorld(Offset(size.width, size.height), size);
-
-    return Rect.fromPoints(topLeft, bottomRight);
-  }
-
-  // Методы для преобразования координат
-  Offset worldToScreen(Offset worldPoint, Size viewportSize) {
-    final transformed = matrix.transform3(vm.Vector3(worldPoint.dx, worldPoint.dy, 0));
-    return Offset(transformed.x + viewportSize.width / 2, transformed.y + viewportSize.height / 2);
-  }
-
-  Offset screenToWorld(Offset screenPoint, Size viewportSize) {
-    // Возвращаем матрицу к исходному состоянию
-    // То есть переводим трансформацию в к мировым координатам
-    final inverse = vm.Matrix4.inverted(matrix);
-    final world = inverse.transform3(
-      vm.Vector3(screenPoint.dx - viewportSize.width / 2, screenPoint.dy - viewportSize.height / 2, 0),
-    );
-    return Offset(world.x, world.y);
+  void centerViewport() {
+    _useObject((object) {
+      final viewport = object.viewport;
+      viewport.reset();
+      object.markNeedsPaint();
+    });
   }
 }
 
 class GraphicsViewport extends LeafRenderObjectWidget {
-  const GraphicsViewport({super.key});
+  const GraphicsViewport({super.key, required this.controller});
+
+  final GraphicsViewportController controller;
 
   @override
   RenderObject createRenderObject(BuildContext context) {
-    return GraphicsViewportRenderObject();
+    return GraphicsViewportRenderObject(controller: controller);
   }
 }
 
 class GraphicsViewportRenderObject extends RenderBox {
-  Gesture _gesture = Gesture.none;
+  GraphicsViewportRenderObject({required this.controller}) {
+    controller._renderObject = WeakReference(this);
+  }
 
-  Viewport viewport = Viewport();
+  final GraphicsViewportController controller;
+  final viewport = Viewport2D();
+
+  Gesture _gesture = Gesture.none;
 
   Offset lastDragPosition = Offset.zero;
 
@@ -110,6 +58,7 @@ class GraphicsViewportRenderObject extends RenderBox {
   @override
   Size computeDryLayout(covariant BoxConstraints constraints) {
     final parentSize = constraints.biggest;
+    viewport.updateProjection(parentSize);
     return parentSize;
   }
 
@@ -132,33 +81,42 @@ class GraphicsViewportRenderObject extends RenderBox {
       _gesture = Gesture.up;
       lastDragPosition = Offset.zero;
     }
-    var worldDelta = delta(event.position, snapOffset(lastDragPosition));
+    var worldDelta = delta(event.position, lastDragPosition);
     if (_gesture.isMoving && worldDelta.distance > 1.0) {
-      viewport.translate(snapOffset(worldDelta));
+      viewport.translate(worldDelta);
       lastDragPosition = event.position;
       markNeedsPaint();
     }
   }
 
-  Offset delta(Offset first, Offset second) => (first - second) / viewport._scale;
+  Offset delta(Offset first, Offset second) => (first - second) / viewport.zoom;
 
   Offset snapOffset(Offset offset) => Offset(snap(offset.dx), snap(offset.dy));
 
-  double snap(double value) {
-    return (value / snapFactor).round() * snapFactor;
-  }
+  double snap(double value) => (value / snapFactor).round() * snapFactor;
 
   @override
   void paint(PaintingContext context, Offset offset) {
     context.canvas
       ..save()
       ..clipRect(Offset.zero & size)
-      ..translate(size.width * .5, size.height * .5)
-      ..transform(viewport.rawMatrix)
+      ..transform(viewport.projection.storage)
+      ..transform(viewport.view.storage)
+      //..transform(viewport.rawMatrix)
       ..drawObject(drawGrid)
       ..drawObject(drawAxis)
       ..drawObject((canvas) {
         canvas.drawRect(Offset.zero & Size(100, 100), Paint()..color = Colors.deepPurple);
+      })
+      ..drawObject((canvas) {
+        final worldRect = viewport.getWorldRect(size).deflate(1.5);
+        canvas.drawRSuperellipse(
+          RSuperellipse.fromRectAndRadius(worldRect, Radius.circular(8)),
+          Paint()
+            ..color = Colors.deepOrange
+            ..strokeWidth = 2.0 / viewport.zoom
+            ..style = PaintingStyle.stroke,
+        );
       })
       ..restore();
   }
@@ -173,14 +131,14 @@ class GraphicsViewportRenderObject extends RenderBox {
         Float32List.fromList([viewportRect.left, 0, viewportRect.right, 0]),
         Paint()
           ..color = Colors.red
-          ..strokeWidth = 1.0 / viewport._scale,
+          ..strokeWidth = 1.0 / viewport.zoom,
       )
       ..drawRawPoints(
         PointMode.lines,
         Float32List.fromList([0, viewportRect.bottom, 0, viewportRect.top]),
         Paint()
           ..color = Colors.green
-          ..strokeWidth = 1.0 / viewport._scale,
+          ..strokeWidth = 1.0 / viewport.zoom,
       )
       ..drawRawPoints(
         PointMode.lines,
@@ -196,7 +154,7 @@ class GraphicsViewportRenderObject extends RenderBox {
     final paint = Paint()
       ..color = Colors.grey.withAlpha(60)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.0 / viewport._scale;
+      ..strokeWidth = 1.0 / viewport.zoom;
 
     final viewportRect = viewport.getWorldRect(size);
 
@@ -215,7 +173,9 @@ class GraphicsViewportRenderObject extends RenderBox {
       path.moveTo(viewportRect.left, y);
       path.lineTo(viewportRect.right, y);
     }
-    canvas.drawPath(path, paint);
+    canvas
+      ..clipRect(viewportRect)
+      ..drawPath(path, paint);
   }
 }
 
