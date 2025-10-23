@@ -34,10 +34,11 @@ class Viewport {
 
   Float64List get rawMatrix => _matrix.storage;
 
-  Matrix4 _initialMatrix() => Matrix4.identity()
-    ..translateByVector3(vm.Vector3(_position.dx, _position.dy, 0))
-    // Отражение по оси Y
-    ..scaleByVector3(vm.Vector3(1, -1, 1));
+  vm.Matrix4 _initialMatrix() {
+    return vm.Matrix4.translation(vm.Vector3(.0, .0, 0))
+      // Отражение по оси Y
+      ..scaleByVector3(vm.Vector3(1, -1, 1));
+  }
 
   void translate(Offset delta) {
     _position += delta;
@@ -46,29 +47,35 @@ class Viewport {
 
   void scale(double scale, [Offset? focalPoint]) {
     _scale *= scale;
-    _scale = _scale.clamp(0.1, 10.0); // Ограничения масштаба
+    _scale = _scale.clamp(1, 10.0) / 10; // Ограничения масштаба
     _updateMatrix();
   }
 
   @pragma('vm:prefer-inline')
   void _updateMatrix() {
-    _matrix = Matrix4.identity()
-      ..translateByVector3(vm.Vector3(_position.dx, _position.dy, 0))
+    _matrix = vm.Matrix4.translation(vm.Vector3(_position.dx, _position.dy, 0))
       ..scaleByVector3(vm.Vector3(1, -1, 1))
       ..scaleByVector3(vm.Vector3.all(_scale));
   }
 
+  Rect getWorldRect(Size size) {
+    // Преобразуем углы экрана в мировые координаты
+    final topLeft = screenToWorld(Offset.zero, size);
+    final bottomRight = screenToWorld(Offset(size.width, size.height), size);
+
+    return Rect.fromPoints(topLeft, bottomRight);
+  }
+
   // Методы для преобразования координат
-  @pragma('vm:prefer-inline')
   Offset worldToScreen(Offset worldPoint, Size viewportSize) {
     final transformed = matrix.transform3(vm.Vector3(worldPoint.dx, worldPoint.dy, 0));
     return Offset(transformed.x + viewportSize.width / 2, transformed.y + viewportSize.height / 2);
   }
 
-  @pragma('vm:prefer-inline')
   Offset screenToWorld(Offset screenPoint, Size viewportSize) {
     // Возвращаем матрицу к исходному состоянию
-    final inverse = Matrix4.inverted(matrix);
+    // То есть переводим трансформацию в к мировым координатам
+    final inverse = vm.Matrix4.inverted(matrix);
     final world = inverse.transform3(
       vm.Vector3(screenPoint.dx - viewportSize.width / 2, screenPoint.dy - viewportSize.height / 2, 0),
     );
@@ -127,8 +134,6 @@ class GraphicsViewportRenderObject extends RenderBox {
     }
     var worldDelta = delta(event.position, snapOffset(lastDragPosition));
     if (_gesture.isMoving && worldDelta.distance > 1.0) {
-      // Создаем матрицу трансформации на основе параметров viewport
-      //deltaVal = snapOffset(deltaVal);
       viewport.translate(snapOffset(worldDelta));
       lastDragPosition = event.position;
       markNeedsPaint();
@@ -159,7 +164,7 @@ class GraphicsViewportRenderObject extends RenderBox {
   }
 
   void drawAxis(Canvas canvas) {
-    final viewportRect = _getVisibleWorldRect();
+    final viewportRect = viewport.getWorldRect(size);
     canvas
       ..save()
       ..clipRect(viewportRect)
@@ -193,7 +198,7 @@ class GraphicsViewportRenderObject extends RenderBox {
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.0 / viewport._scale;
 
-    final viewportRect = _getVisibleWorldRect();
+    final viewportRect = viewport.getWorldRect(size);
 
     final gridSize = snapFactor;
     final startX = (viewportRect.left / gridSize).floor() * gridSize;
@@ -211,14 +216,6 @@ class GraphicsViewportRenderObject extends RenderBox {
       path.lineTo(viewportRect.right, y);
     }
     canvas.drawPath(path, paint);
-  }
-
-  Rect _getVisibleWorldRect() {
-    // Преобразуем углы экрана в мировые координаты
-    final topLeft = viewport.screenToWorld(Offset.zero, size);
-    final bottomRight = viewport.screenToWorld(Offset(size.width, size.height), size);
-
-    return Rect.fromPoints(topLeft, bottomRight);
   }
 }
 
