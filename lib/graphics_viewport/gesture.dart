@@ -1,4 +1,4 @@
-extension type const Gesture._(int val) {
+extension type const Gesture._(int val) implements Object {
   static const Gesture none = Gesture._(0);
 
   static const Gesture down = Gesture._(1);

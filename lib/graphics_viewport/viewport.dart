@@ -17,12 +17,11 @@ class Viewport2D {
   Matrix4 get matrix => _projection * _view;
 
   double get zoom => _scale;
+  Offset get position => _position;
 
   void updateProjection(Size size) {
     viewportSize = size;
-    _projection = Matrix4.translation(Vector3(size.width / 2, size.height / 2, 0))
-      // Отражение по оси Y
-      ..scaleByVector3(Vector3(1, -1, 1));
+    _projection = Matrix4.translation(Vector3(size.width / 2, size.height / 2, 0));
     _updateMatrix();
   }
 
@@ -46,16 +45,19 @@ class Viewport2D {
     _updateMatrix();
   }
 
-  void scale(double scale) {
-    // Применяем масштабирование
-    final newScale = (_scale * scale).clamp(0.1, 10.0);
+  void scale(double scale, Offset focalPoint) {
+    final oldScale = _scale;
+    final newScale = (_scale * scale).clamp(0.5, 10.0);
+
+    if (oldScale == newScale) return;
+
     _scale = newScale;
     _updateMatrix();
   }
 
   @pragma('vm:prefer-inline')
   void _updateMatrix() {
-    _view = Matrix4.translation(Vector3(_position.dx, -_position.dy, 0))..scaleByVector3(Vector3(_scale, _scale, 1));
+    _view = Matrix4.translation(Vector3(_position.dx, _position.dy, 0))..scaleByVector3(Vector3(_scale, _scale, 1));
   }
 
   @pragma('vm:prefer-inline')
@@ -67,6 +69,7 @@ class Viewport2D {
 
   @pragma('vm:prefer-inline')
   Offset screenToWorld(Offset screenPoint) {
+    // Мировые_координаты = inverse(Проекционная_матрица × Видовая_матрица) × Экранные_координаты
     // 1. Создаем инвертированную матрицу трансформации
     // Инвертирование матрицы трансформации (обратная матрица) позволяет «отменить» действие исходной матрицы.
     // Это важно, так как матрица линейного преобразования влияет на все векторы векторного пространства:

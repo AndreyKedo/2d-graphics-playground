@@ -1,5 +1,5 @@
 import 'dart:typed_data';
-import 'dart:ui';
+import 'dart:ui' as ui;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -27,6 +27,7 @@ class GraphicsViewportController {
     _useObject((object) {
       final viewport = object.viewport;
       viewport.reset();
+      object.lastDragPosition = object.size.center(Offset.zero);
       object.markNeedsPaint();
     });
   }
@@ -67,6 +68,7 @@ class GraphicsViewportRenderObject extends RenderBox {
   Size computeDryLayout(covariant BoxConstraints constraints) {
     final parentSize = constraints.biggest;
     viewport.updateProjection(parentSize);
+    lastDragPosition = parentSize.center(Offset.zero);
     return parentSize;
   }
 
@@ -95,7 +97,7 @@ class GraphicsViewportRenderObject extends RenderBox {
     if (_gesture == Gesture.scroll) {
       if (event is PointerScrollEvent) {
         final factor = event.scrollDelta.dy.isNegative ? 1.2 : 0.9;
-        viewport.scale(factor);
+        viewport.scale(factor, lastDragPosition = event.position);
         markNeedsPaint();
         return;
       }
@@ -124,7 +126,19 @@ class GraphicsViewportRenderObject extends RenderBox {
       ..drawObject(drawGrid)
       ..drawObject(drawAxis)
       ..drawObject((canvas) {
-        canvas.drawRect(Offset.zero & Size(100, 100), Paint()..color = Colors.grey);
+        final rect = Offset.zero & Size(100, 100);
+        final paint = Paint()..color = Colors.grey.shade300.withAlpha(164);
+        canvas
+          ..save()
+          ..drawRect(rect, paint)
+          ..drawRect(
+            rect,
+            paint
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = 1.6 / viewport.zoom
+              ..color = Colors.grey.shade400,
+          )
+          ..restore();
       })
       ..drawObject((canvas) {
         canvas.drawRSuperellipse(
@@ -132,31 +146,62 @@ class GraphicsViewportRenderObject extends RenderBox {
           Paint()
             ..style = PaintingStyle.stroke
             ..strokeWidth = 10.0 / viewport.zoom
-            ..color = Colors.grey.shade300,
+            ..color = Colors.grey.shade400.withAlpha(210),
         );
       })
+      ..drawObject((canvas) {
+        final worldOffset = viewport.screenToWorld(lastDragPosition);
+
+        canvas.drawRawPoints(
+          ui.PointMode.points,
+          Float32List.fromList([worldOffset.dx, worldOffset.dy]),
+          Paint()
+            ..color = Colors.red
+            ..strokeWidth = 6.0 / viewport.zoom,
+        );
+      })
+      ..drawObject((canvas) {
+        final worldPos = viewport.screenToWorld(lastDragPosition);
+        final text =
+            'Scale: ${viewport.zoom.toStringAsFixed(2)}\n'
+            'Pos: (${viewport.position.dx.toStringAsFixed(1)}, '
+            '${viewport.position.dy.toStringAsFixed(1)})\n'
+            'World: (${worldPos.dx.toStringAsFixed(1)}, '
+            '${worldPos.dy.toStringAsFixed(1)})';
+
+        final paragraph = _buildTextParagraph(text);
+        paragraph.layout(ui.ParagraphConstraints(width: 200));
+        canvas.drawParagraph(paragraph, Offset(10, 10));
+      })
       ..restore();
+  }
+
+  ui.Paragraph _buildTextParagraph(String text) {
+    final builder = ui.ParagraphBuilder(ui.ParagraphStyle(fontSize: 12.0, fontFamily: 'Monospace'))
+      ..pushStyle(ui.TextStyle(color: Colors.black))
+      ..addText(text);
+    return builder.build();
   }
 
   void drawAxis(Canvas canvas) {
     final viewportRect = viewport.getWorldRect();
     canvas
       ..drawRawPoints(
-        PointMode.lines,
+        ui.PointMode.lines,
         Float32List.fromList([viewportRect.left, 0, viewportRect.right, 0]),
         Paint()
           ..color = Colors.red
           ..strokeWidth = 1.0 / viewport.zoom,
       )
       ..drawRawPoints(
-        PointMode.lines,
+        ui.PointMode.lines,
         Float32List.fromList([0, viewportRect.bottom, 0, viewportRect.top]),
         Paint()
           ..color = Colors.green
           ..strokeWidth = 1.0 / viewport.zoom,
       )
       ..drawRawPoints(
-        PointMode.lines,
+        ui.PointMode.lines,
         Float32List.fromList([-4, 0, 4, 0, 0, -4, 0, 4]),
         Paint()
           ..color = Colors.black
