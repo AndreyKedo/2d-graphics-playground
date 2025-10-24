@@ -1,10 +1,18 @@
 import 'dart:typed_data';
 import 'dart:ui';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:graphics_playground/graphics_viewport/gesture.dart';
 import 'package:graphics_playground/graphics_viewport/viewport.dart';
+
+class GVPainterContext {
+  GVPainterContext({required this.viewport, required this.canvas});
+
+  final Viewport2D viewport;
+  final Canvas canvas;
+}
 
 class GraphicsViewportController {
   WeakReference<GraphicsViewportRenderObject>? _renderObject;
@@ -80,7 +88,19 @@ class GraphicsViewportRenderObject extends RenderBox {
     } else if (event is PointerUpEvent) {
       _gesture = Gesture.up;
       lastDragPosition = Offset.zero;
+    } else if (event case PointerScrollEvent(kind: PointerDeviceKind.mouse)) {
+      _gesture = Gesture.scroll;
     }
+
+    if (_gesture == Gesture.scroll) {
+      if (event is PointerScrollEvent) {
+        final factor = event.scrollDelta.dy.isNegative ? 1.2 : 0.9;
+        viewport.scale(factor);
+        markNeedsPaint();
+        return;
+      }
+    }
+
     var worldDelta = delta(event.position, lastDragPosition);
     if (_gesture.isMoving && worldDelta.distance > 1.0) {
       viewport.translate(worldDelta);
@@ -100,32 +120,27 @@ class GraphicsViewportRenderObject extends RenderBox {
     context.canvas
       ..save()
       ..clipRect(Offset.zero & size)
-      ..transform(viewport.projection.storage)
-      ..transform(viewport.view.storage)
-      //..transform(viewport.rawMatrix)
+      ..transform(viewport.matrix.storage)
       ..drawObject(drawGrid)
       ..drawObject(drawAxis)
       ..drawObject((canvas) {
-        canvas.drawRect(Offset.zero & Size(100, 100), Paint()..color = Colors.deepPurple);
+        canvas.drawRect(Offset.zero & Size(100, 100), Paint()..color = Colors.grey);
       })
       ..drawObject((canvas) {
-        final worldRect = viewport.getWorldRect(size).deflate(1.5);
         canvas.drawRSuperellipse(
-          RSuperellipse.fromRectAndRadius(worldRect, Radius.circular(8)),
+          RSuperellipse.fromRectAndRadius(viewport.getWorldRect(), Radius.circular(12) / viewport.zoom),
           Paint()
-            ..color = Colors.deepOrange
-            ..strokeWidth = 2.0 / viewport.zoom
-            ..style = PaintingStyle.stroke,
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 10.0 / viewport.zoom
+            ..color = Colors.grey.shade300,
         );
       })
       ..restore();
   }
 
   void drawAxis(Canvas canvas) {
-    final viewportRect = viewport.getWorldRect(size);
+    final viewportRect = viewport.getWorldRect();
     canvas
-      ..save()
-      ..clipRect(viewportRect)
       ..drawRawPoints(
         PointMode.lines,
         Float32List.fromList([viewportRect.left, 0, viewportRect.right, 0]),
@@ -146,8 +161,7 @@ class GraphicsViewportRenderObject extends RenderBox {
         Paint()
           ..color = Colors.black
           ..strokeWidth = 1.5,
-      )
-      ..restore();
+      );
   }
 
   void drawGrid(Canvas canvas) {
@@ -156,7 +170,7 @@ class GraphicsViewportRenderObject extends RenderBox {
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.0 / viewport.zoom;
 
-    final viewportRect = viewport.getWorldRect(size);
+    final viewportRect = viewport.getWorldRect();
 
     final gridSize = snapFactor;
     final startX = (viewportRect.left / gridSize).floor() * gridSize;

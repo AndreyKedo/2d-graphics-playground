@@ -4,6 +4,7 @@ extension type const Gesture._(int val) {
   static const Gesture down = Gesture._(1);
   static const Gesture up = Gesture._(2);
   static const Gesture move = Gesture._(3);
+  static const Gesture scroll = Gesture._(4);
 
   Gesture compose(Gesture other) => Gesture._(val | other.val);
 

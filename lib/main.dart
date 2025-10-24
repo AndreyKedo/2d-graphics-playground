@@ -10,7 +10,17 @@ class MainApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(home: PlaygroundWidget());
+    return MaterialApp(
+      theme: ThemeData.from(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Colors.grey.shade300,
+          dynamicSchemeVariant: DynamicSchemeVariant.content,
+        ),
+        useMaterial3: true,
+      ),
+      themeMode: ThemeMode.system,
+      home: const PlaygroundWidget(),
+    );
   }
 }
 
