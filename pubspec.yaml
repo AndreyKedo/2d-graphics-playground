@@ -1,5 +1,5 @@
 name: graphics_playground
-description: "A new Flutter project."
+description: "A simple 2D graphics playground written in Dart."
 publish_to: 'none'
 version: 0.1.0
 
