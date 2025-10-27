@@ -1,22 +1,20 @@
-import 'dart:typed_data';
-import 'dart:ui' as ui;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
+import 'package:graphics_playground/core/canvas_extension.dart';
+import 'package:graphics_playground/graphics_viewport/develop/editor_metrics_painter.dart';
+import 'package:graphics_playground/graphics_viewport/editor/axis_painter.dart';
+import 'package:graphics_playground/graphics_viewport/develop/performance_overlay_painter.dart';
 import 'package:graphics_playground/graphics_viewport/gesture.dart';
+import 'package:graphics_playground/graphics_viewport/editor/grid_painter.dart';
+import 'package:graphics_playground/graphics_viewport/painter_context.dart';
 import 'package:graphics_playground/graphics_viewport/viewport.dart';
-
-class GVPainterContext {
-  GVPainterContext({required this.viewport, required this.canvas});
-
-  final Viewport2D viewport;
-  final Canvas canvas;
-}
 
 class GraphicsViewportController {
   WeakReference<GraphicsViewportRenderObject>? _renderObject;
 
+  @pragma('vm:prefer-inline')
   void _useObject(void Function(GraphicsViewportRenderObject object) callback) {
     if (_renderObject?.target case GraphicsViewportRenderObject object) {
       callback(object);
@@ -34,29 +32,73 @@ class GraphicsViewportController {
 }
 
 class GraphicsViewport extends LeafRenderObjectWidget {
-  const GraphicsViewport({super.key, required this.controller});
+  const GraphicsViewport({
+    super.key,
+    required this.controller,
+    this.performanceOverlayOps = PerformanceOverlayOptionExtension.none,
+  });
 
   final GraphicsViewportController controller;
 
+  final int performanceOverlayOps;
+
   @override
   RenderObject createRenderObject(BuildContext context) {
-    return GraphicsViewportRenderObject(controller: controller);
+    return GraphicsViewportRenderObject(controller: controller, overlayOption: performanceOverlayOps);
+  }
+
+  @override
+  void updateRenderObject(BuildContext context, GraphicsViewportRenderObject renderObject) {
+    renderObject
+      ..overlayOption = performanceOverlayOps
+      ..controller = controller;
+    super.updateRenderObject(context, renderObject);
   }
 }
 
 class GraphicsViewportRenderObject extends RenderBox {
-  GraphicsViewportRenderObject({required this.controller}) {
+  GraphicsViewportRenderObject({required GraphicsViewportController controller, required int overlayOption})
+    : _overlayOption = overlayOption,
+      _controller = controller {
     controller._renderObject = WeakReference(this);
   }
 
-  final GraphicsViewportController controller;
   final viewport = Viewport2D();
+
+  final performanceOverlayPainter = PerformanceOverlayPainter();
+  final gridPainter = GridPainter();
+  final axisPainter = AxisPainter();
+  final editorMetrics = EditorMetricsPainter();
+
+  final translationInfoLayer = LayerHandle<ContainerLayer>();
 
   Gesture _gesture = Gesture.none;
 
-  Offset lastDragPosition = Offset.zero;
+  Offset _lastDragPosition = Offset.zero;
+  Offset get lastDragPosition => _lastDragPosition;
+  set lastDragPosition(Offset value) {
+    _lastDragPosition = value;
+    editorMetrics.lastDragPosition = value;
+  }
 
-  double snapFactor = 20;
+  int _overlayOption;
+  int get overlayOption => _overlayOption;
+  set overlayOption(int value) {
+    if (value == _overlayOption) return;
+
+    _overlayOption = value;
+    performanceOverlayPainter.overlayOption = _overlayOption;
+    markNeedsPaint();
+  }
+
+  GraphicsViewportController _controller;
+  GraphicsViewportController get controller => _controller;
+  set controller(GraphicsViewportController value) {
+    if (value == _controller) return;
+    _controller._renderObject = null;
+    _controller = value;
+    controller._renderObject = WeakReference(this);
+  }
 
   @override
   bool get sizedByParent => true;
@@ -67,8 +109,14 @@ class GraphicsViewportRenderObject extends RenderBox {
   @override
   Size computeDryLayout(covariant BoxConstraints constraints) {
     final parentSize = constraints.biggest;
+    // Update viewport
     viewport.updateProjection(parentSize);
-    lastDragPosition = parentSize.center(Offset.zero);
+
+    // Overlay setup
+    performanceOverlayPainter.overlayRect = Offset.zero & Size(parentSize.width, 200);
+    performanceOverlayPainter.overlayOption = _overlayOption;
+
+    debugPrint('GraphicsViewportRenderObject.computeDryLayout: $parentSize');
     return parentSize;
   }
 
@@ -97,13 +145,15 @@ class GraphicsViewportRenderObject extends RenderBox {
     if (_gesture == Gesture.scroll) {
       if (event is PointerScrollEvent) {
         final factor = event.scrollDelta.dy.isNegative ? 1.2 : 0.9;
-        viewport.scale(factor, lastDragPosition = event.position);
-        markNeedsPaint();
+        if (viewport.scale(factor, lastDragPosition = event.position)) {
+          markNeedsPaint();
+        }
         return;
       }
     }
 
-    var worldDelta = delta(event.position, lastDragPosition);
+    var worldDelta = (event.position - lastDragPosition) / viewport.zoom;
+
     if (_gesture.isMoving && worldDelta.distance > 1.0) {
       viewport.translate(worldDelta);
       lastDragPosition = event.position;
@@ -111,136 +161,55 @@ class GraphicsViewportRenderObject extends RenderBox {
     }
   }
 
-  Offset delta(Offset first, Offset second) => (first - second) / viewport.zoom;
+  // Offset snapOffset(Offset offset) => Offset(snap(offset.dx), snap(offset.dy));
 
-  Offset snapOffset(Offset offset) => Offset(snap(offset.dx), snap(offset.dy));
-
-  double snap(double value) => (value / snapFactor).round() * snapFactor;
+  // double snap(double value) => (value / snapFactor).round() * snapFactor;
 
   @override
   void paint(PaintingContext context, Offset offset) {
+    final gvContext = GVPainterContext(surfaceContext: context, offset: offset, viewport: viewport);
     context.canvas
       ..save()
-      ..clipRect(Offset.zero & size)
+      ..translate(offset.dx, offset.dy)
+      ..clipRect(offset & size)
       ..transform(viewport.matrix.storage)
-      ..drawObject(drawGrid)
-      ..drawObject(drawAxis)
       ..drawObject((canvas) {
-        final rect = Offset.zero & Size(100, 100);
-        final paint = Paint()..color = Colors.grey.shade300.withAlpha(164);
-        canvas
-          ..save()
-          ..drawRect(rect, paint)
-          ..drawRect(
-            rect,
-            paint
-              ..style = PaintingStyle.stroke
-              ..strokeWidth = 1.6 / viewport.zoom
-              ..color = Colors.grey.shade400,
-          )
-          ..restore();
+        gridPainter.paint(gvContext);
+        axisPainter.paint(gvContext);
       })
       ..drawObject((canvas) {
         canvas.drawRSuperellipse(
           RSuperellipse.fromRectAndRadius(viewport.getWorldRect(), Radius.circular(12) / viewport.zoom),
           Paint()
             ..style = PaintingStyle.stroke
-            ..strokeWidth = 10.0 / viewport.zoom
-            ..color = Colors.grey.shade400.withAlpha(210),
+            ..color = Colors.grey.shade400.withAlpha(210)
+            ..strokeWidth = 10.0 / viewport.zoom,
         );
-      })
-      ..drawObject((canvas) {
-        final worldOffset = viewport.screenToWorld(lastDragPosition);
+      });
+    // ..drawObject((canvas) {
+    //   final rect = Offset.zero & Size(100, 100);
+    //   final paint = Paint()..color = Colors.grey.shade300.withAlpha(164);
+    //   canvas
+    //     ..save()
+    //     ..drawRect(rect, paint)
+    //     ..drawRect(
+    //       rect,
+    //       paint
+    //         ..style = PaintingStyle.stroke
+    //         ..strokeWidth = 1.6 / viewport.zoom
+    //         ..color = Colors.grey.shade400,
+    //     )
+    //     ..restore();
+    // })
 
-        canvas.drawRawPoints(
-          ui.PointMode.points,
-          Float32List.fromList([worldOffset.dx, worldOffset.dy]),
-          Paint()
-            ..color = Colors.red
-            ..strokeWidth = 6.0 / viewport.zoom,
-        );
-      })
-      ..drawObject((canvas) {
-        final worldPos = viewport.screenToWorld(lastDragPosition);
-        final text =
-            'Scale: ${viewport.zoom.toStringAsFixed(2)}\n'
-            'Pos: (${viewport.position.dx.toStringAsFixed(1)}, '
-            '${viewport.position.dy.toStringAsFixed(1)})\n'
-            'World: (${worldPos.dx.toStringAsFixed(1)}, '
-            '${worldPos.dy.toStringAsFixed(1)})';
-
-        final paragraph = _buildTextParagraph(text);
-        paragraph.layout(ui.ParagraphConstraints(width: 200));
-        canvas.drawParagraph(paragraph, Offset(10, 10));
-      })
-      ..restore();
+    performanceOverlayPainter.paint(gvContext);
+    editorMetrics.paint(gvContext);
+    context.canvas.restore();
   }
 
-  ui.Paragraph _buildTextParagraph(String text) {
-    final builder = ui.ParagraphBuilder(ui.ParagraphStyle(fontSize: 12.0, fontFamily: 'Monospace'))
-      ..pushStyle(ui.TextStyle(color: Colors.black))
-      ..addText(text);
-    return builder.build();
-  }
-
-  void drawAxis(Canvas canvas) {
-    final viewportRect = viewport.getWorldRect();
-    canvas
-      ..drawRawPoints(
-        ui.PointMode.lines,
-        Float32List.fromList([viewportRect.left, 0, viewportRect.right, 0]),
-        Paint()
-          ..color = Colors.red
-          ..strokeWidth = 1.0 / viewport.zoom,
-      )
-      ..drawRawPoints(
-        ui.PointMode.lines,
-        Float32List.fromList([0, viewportRect.bottom, 0, viewportRect.top]),
-        Paint()
-          ..color = Colors.green
-          ..strokeWidth = 1.0 / viewport.zoom,
-      )
-      ..drawRawPoints(
-        ui.PointMode.lines,
-        Float32List.fromList([-4, 0, 4, 0, 0, -4, 0, 4]),
-        Paint()
-          ..color = Colors.black
-          ..strokeWidth = 1.5,
-      );
-  }
-
-  void drawGrid(Canvas canvas) {
-    final paint = Paint()
-      ..color = Colors.grey.withAlpha(60)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.0 / viewport.zoom;
-
-    final viewportRect = viewport.getWorldRect();
-
-    final gridSize = snapFactor;
-    final startX = (viewportRect.left / gridSize).floor() * gridSize;
-    final endX = (viewportRect.right / gridSize).ceil() * gridSize;
-    final startY = (viewportRect.top / gridSize).floor() * gridSize;
-    final endY = (viewportRect.bottom / gridSize).ceil() * gridSize;
-
-    final path = Path();
-    for (double x = startX.toDouble(); x < endX; x += gridSize) {
-      path.moveTo(x, viewportRect.top);
-      path.lineTo(x, viewportRect.bottom);
-    }
-    for (double y = startY.toDouble(); y < endY; y += gridSize) {
-      path.moveTo(viewportRect.left, y);
-      path.lineTo(viewportRect.right, y);
-    }
-    canvas
-      ..clipRect(viewportRect)
-      ..drawPath(path, paint);
-  }
-}
-
-extension CanvasExtension on Canvas {
-  Canvas drawObject(void Function(Canvas canvas) draw) {
-    draw(this);
-    return this;
+  @override
+  void dispose() {
+    editorMetrics.dispose();
+    super.dispose();
   }
 }

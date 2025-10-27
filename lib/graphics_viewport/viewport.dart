@@ -21,7 +21,7 @@ class Viewport2D {
 
   void updateProjection(Size size) {
     viewportSize = size;
-    _projection = Matrix4.translation(Vector3(size.width / 2, size.height / 2, 0));
+    _projection = Matrix4.translationValues(size.width / 2, size.height / 2, 0);
     _updateMatrix();
   }
 
@@ -45,19 +45,33 @@ class Viewport2D {
     _updateMatrix();
   }
 
-  void scale(double scale, Offset focalPoint) {
+  Offset worldFocalBefore = Offset.zero;
+  bool scale(double scale, Offset focalPoint) {
     final oldScale = _scale;
-    final newScale = (_scale * scale).clamp(0.5, 10.0);
+    final newScale = _constraintScale(_scale * scale);
 
-    if (oldScale == newScale) return;
-
+    if (oldScale == newScale) return false;
     _scale = newScale;
+    // final worldFocal = screenToWorld(focalPoint);
+    // final r = Vector3(worldFocal.dx, worldFocal.dy, 1) - Vector3(worldFocalBefore.dx, worldFocalBefore.dy, 1.0);
+    // worldFocalBefore = worldFocal;
+    // // 2. Устанавливаем новый масштаб
+    // _scale = newScale;
+    // _position += _position - Offset(r.x, r.y);
+    //_position += (worldFocalBefore - _position) * (oldScale / newScale);
     _updateMatrix();
+
+    return true;
   }
 
   @pragma('vm:prefer-inline')
   void _updateMatrix() {
-    _view = Matrix4.translation(Vector3(_position.dx, _position.dy, 0))..scaleByVector3(Vector3(_scale, _scale, 1));
+    _view = Matrix4.translationValues(_position.dx, _position.dy, 0)..scaleByVector3(Vector3(_scale, _scale, 1));
+  }
+
+  @pragma('vm:prefer-inline')
+  double _constraintScale(double scale) {
+    return scale.clamp(0.1, 10.0);
   }
 
   @pragma('vm:prefer-inline')
@@ -65,6 +79,12 @@ class Viewport2D {
     final topLeft = screenToWorld(Offset.zero);
     final bottomRight = screenToWorld(Offset(viewportSize.width, viewportSize.height));
     return Rect.fromPoints(topLeft, bottomRight);
+  }
+
+  @pragma('vm:prefer-inline')
+  Offset worldToScreen(Offset worldPoint) {
+    final vector = matrix.transform3(Vector3(worldPoint.dx, worldPoint.dy, 0));
+    return Offset(vector.x, vector.y);
   }
 
   @pragma('vm:prefer-inline')
