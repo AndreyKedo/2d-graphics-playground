@@ -9,9 +9,7 @@ class AxisPainter {
 
   final dxAxisPainter = Paint()..color = Colors.red;
   final dyAxisPainter = Paint()..color = Colors.green;
-  final crossPainter = Paint()
-    ..color = Colors.black
-    ..strokeWidth = 1.5;
+  final crossPainter = Paint()..color = Colors.black;
 
   final crossAxisPosition = Float32List.fromList([-4, 0, 4, 0, 0, -4, 0, 4]);
 
@@ -44,7 +42,7 @@ class AxisPainter {
     }
 
     if (drawDxAxis && drawDyAxis) {
-      canvas.drawRawPoints(PointMode.lines, crossAxisPosition, crossPainter);
+      canvas.drawRawPoints(PointMode.lines, crossAxisPosition, crossPainter..strokeWidth = 1.5 / viewport.zoom);
     }
 
     canvas.restore();

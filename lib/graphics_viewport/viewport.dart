@@ -1,51 +1,32 @@
-import 'dart:ui';
-import 'package:vector_math/vector_math_64.dart';
+import 'package:flutter/rendering.dart';
+//import 'package:vector_math/vector_math_64.dart' show Vector3;
 
 class Viewport2D {
-  Matrix4 _view = Matrix4.identity();
-  Matrix4 _projection = Matrix4.identity();
-
+  //Matrix4 matrix = Matrix4.identity();
   Size viewportSize = Size.zero;
   Offset _position = Offset.zero;
   double _scale = 1.0;
-
-  // Видовая матрица (преобразования камеры)
-  Matrix4 get view => _view.clone();
-  // Проекционная матрица (преобразования в экранные координаты)
-  Matrix4 get projection => _projection.clone();
-  // Комбинированная матрица (проекционная * видовая)
-  Matrix4 get matrix => _projection * _view;
 
   double get zoom => _scale;
   Offset get position => _position;
 
   void updateProjection(Size size) {
     viewportSize = size;
-    _projection = Matrix4.translationValues(size.width / 2, size.height / 2, 0);
-    _updateMatrix();
-  }
-
-  void setMatrixRaw(Matrix4 matrix) {
-    _view.multiply(matrix);
   }
 
   void reset() {
     _position = Offset.zero;
     _scale = 1.0;
-    _updateMatrix();
   }
 
   void setPosition(Offset position) {
     _position = position;
-    _updateMatrix();
   }
 
   void translate(Offset delta) {
-    _position += delta * _scale;
-    _updateMatrix();
+    _position += delta;
   }
 
-  Offset worldFocalBefore = Offset.zero;
   bool scale(double scale, Offset focalPoint) {
     final oldScale = _scale;
     final newScale = _constraintScale(_scale * scale);
@@ -59,14 +40,16 @@ class Viewport2D {
     // _scale = newScale;
     // _position += _position - Offset(r.x, r.y);
     //_position += (worldFocalBefore - _position) * (oldScale / newScale);
-    _updateMatrix();
 
     return true;
   }
 
-  @pragma('vm:prefer-inline')
-  void _updateMatrix() {
-    _view = Matrix4.translationValues(_position.dx, _position.dy, 0)..scaleByVector3(Vector3(_scale, _scale, 1));
+  void applyTransformation(Canvas canvas) {
+    canvas
+      ..translate(viewportSize.width / 2, viewportSize.height / 2)
+      ..scale(_scale, _scale)
+      ..translate(_position.dx, _position.dy);
+    //matrix = Matrix4.fromFloat64List(canvas.getTransform());
   }
 
   @pragma('vm:prefer-inline')
@@ -83,12 +66,16 @@ class Viewport2D {
 
   @pragma('vm:prefer-inline')
   Offset worldToScreen(Offset worldPoint) {
-    final vector = matrix.transform3(Vector3(worldPoint.dx, worldPoint.dy, 0));
-    return Offset(vector.x, vector.y);
+    final center = worldPoint - _position;
+    return center * _scale + Offset(viewportSize.width / 2, viewportSize.height / 2);
+    // final screen = matrix.transform3(Vector3(worldPoint.dx, worldPoint.dy, 0));
+    // return Offset(screen.x, screen.y);
   }
 
   @pragma('vm:prefer-inline')
   Offset screenToWorld(Offset screenPoint) {
+    final center = Offset(screenPoint.dx - viewportSize.width / 2, screenPoint.dy - viewportSize.height / 2);
+    return center / _scale + (_position * -1);
     // Мировые_координаты = inverse(Проекционная_матрица × Видовая_матрица) × Экранные_координаты
     // 1. Создаем инвертированную матрицу трансформации
     // Инвертирование матрицы трансформации (обратная матрица) позволяет «отменить» действие исходной матрицы.
@@ -102,10 +89,10 @@ class Viewport2D {
     //       |                  |
     //       |                  |y
     // [World coordinates]      [Screen coordinates]
-    final inverse = Matrix4.inverted(matrix);
-    // 2. Преобразуем Offset в Vector3
-    // Вектор = Матрица * Вектор
-    final world = inverse.transform3(Vector3(screenPoint.dx, screenPoint.dy, 0));
-    return Offset(world.x, world.y);
+    // final inverse = Matrix4.inverted(matrix);
+    // // 2. Преобразуем Offset в Vector3
+    // // Вектор = Матрица * Вектор
+    // final world = inverse.transform3(Vector3(screenPoint.dx, screenPoint.dy, 0));
+    // return Offset(world.x, world.y);
   }
 }

@@ -37,6 +37,12 @@ class _PlaygroundWidgetState extends State<PlaygroundWidget> {
   final controller = GraphicsViewportController();
 
   @override
+  void dispose() {
+    controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: GraphicsViewport(controller: controller, performanceOverlayOps: PerformanceOverlayOptionExtension.all),

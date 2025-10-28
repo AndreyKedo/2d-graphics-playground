@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -28,6 +30,10 @@ class GraphicsViewportController {
       object.lastDragPosition = object.size.center(Offset.zero);
       object.markNeedsPaint();
     });
+  }
+
+  void dispose() {
+    _renderObject = null;
   }
 }
 
@@ -168,11 +174,13 @@ class GraphicsViewportRenderObject extends RenderBox {
   @override
   void paint(PaintingContext context, Offset offset) {
     final gvContext = GVPainterContext(surfaceContext: context, offset: offset, viewport: viewport);
-    context.canvas
+    final canvas = context.canvas;
+    canvas
       ..save()
       ..translate(offset.dx, offset.dy)
-      ..clipRect(offset & size)
-      ..transform(viewport.matrix.storage)
+      ..clipRect(offset & size);
+    viewport.applyTransformation(canvas);
+    canvas
       ..drawObject((canvas) {
         gridPainter.paint(gvContext);
         axisPainter.paint(gvContext);
@@ -185,22 +193,25 @@ class GraphicsViewportRenderObject extends RenderBox {
             ..color = Colors.grey.shade400.withAlpha(210)
             ..strokeWidth = 10.0 / viewport.zoom,
         );
+      })
+      ..drawObject((canvas) {
+        final rect = Offset.zero & Size(100, 100);
+        final paint = Paint()..color = Colors.grey.shade300.withAlpha(164);
+        canvas
+          ..save()
+          ..drawRect(rect, paint)
+          ..drawRect(
+            rect,
+            paint
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = 1.6 / viewport.zoom
+              ..color = Colors.grey.shade400,
+          )
+          ..drawLine(Offset(rect.center.dx, rect.top), Offset(rect.center.dx, rect.bottom), paint)
+          ..drawLine(Offset(rect.center.dx, rect.bottom), Offset(rect.center.dx - 8, rect.bottom - 12), paint)
+          ..drawLine(Offset(rect.center.dx, rect.bottom), Offset(rect.center.dx + 8, rect.bottom - 12), paint)
+          ..restore();
       });
-    // ..drawObject((canvas) {
-    //   final rect = Offset.zero & Size(100, 100);
-    //   final paint = Paint()..color = Colors.grey.shade300.withAlpha(164);
-    //   canvas
-    //     ..save()
-    //     ..drawRect(rect, paint)
-    //     ..drawRect(
-    //       rect,
-    //       paint
-    //         ..style = PaintingStyle.stroke
-    //         ..strokeWidth = 1.6 / viewport.zoom
-    //         ..color = Colors.grey.shade400,
-    //     )
-    //     ..restore();
-    // })
 
     performanceOverlayPainter.paint(gvContext);
     editorMetrics.paint(gvContext);
