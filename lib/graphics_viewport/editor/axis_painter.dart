@@ -2,9 +2,10 @@ import 'dart:typed_data';
 import 'dart:ui' show PointMode;
 
 import 'package:flutter/material.dart';
+import 'package:graphics_playground/graphics_viewport/gv_painter.dart';
 import 'package:graphics_playground/graphics_viewport/painter_context.dart';
 
-class AxisPainter {
+class AxisPainter extends GvPainter {
   AxisPainter();
 
   final dxAxisPainter = Paint()..color = Colors.red;
@@ -13,6 +14,7 @@ class AxisPainter {
 
   final crossAxisPosition = Float32List.fromList([-4, 0, 4, 0, 0, -4, 0, 4]);
 
+  @override
   void paint(GVPainterContext context) {
     final (:canvas, :viewport) = context.expanded;
 

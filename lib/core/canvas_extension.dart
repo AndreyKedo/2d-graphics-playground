@@ -18,8 +18,8 @@ extension CanvasExtension on Canvas {
   void drawOnPictureLayer({
     required LayerHandle<PictureLayer> layer,
     required PaintingContext context,
-    required Rect bounds,
     required ValueSetter<Canvas> draw,
+    Rect bounds = Rect.zero,
   }) {
     if (layer.layer == null) {
       final pictureRecorder = PictureRecorder();
