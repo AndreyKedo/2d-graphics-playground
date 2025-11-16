@@ -2,7 +2,7 @@ import 'package:flutter/rendering.dart';
 import 'package:graphics_playground/graphics_viewport/gv_painter.dart';
 import 'package:graphics_playground/graphics_viewport/painter_context.dart';
 
-class PerformanceOverlayPainter extends GvPainter {
+class PerformanceOverlayPainter extends GvPainterMixin {
   PerformanceOverlayPainter();
 
   int overlayOption = PerformanceOverlayOptionExtension.none;

@@ -1,22 +1,41 @@
 import 'dart:ui' as ui;
 
-import 'package:flutter/foundation.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart' show Colors;
+import 'package:graphics_playground/core/canvas_extension.dart';
 import 'package:graphics_playground/graphics_viewport/gv_painter.dart';
 import 'package:graphics_playground/graphics_viewport/painter_context.dart';
 
-class QuadPrimitiveObject extends GvPainter {
+class QuadPrimitiveObject extends GvPainterMixin {
   QuadPrimitiveObject();
+
+  final _cubeBackground = Paint()..color = Colors.grey.shade300.withAlpha(164);
+  final _cubeBorder = Paint()
+    ..color = Colors.grey.shade300.withAlpha(164)
+    ..style = ui.PaintingStyle.stroke
+    ..color = Colors.grey.shade400;
 
   ui.Picture? _cubePicture;
 
-  ui.Rect _rect = ui.Offset.zero & ui.Size(200, 200);
+  Rect _rect = Offset.zero & ui.Size(200, 200);
 
   bool move = false;
   Offset lastPosition = Offset.zero;
 
   bool _repaint = false;
+
+  void _markNeedRepaint() {
+    _cubePicture = null;
+    _repaint = true;
+  }
+
+  void _innerPaint(ui.Canvas canvas) {
+    canvas
+      ..drawRect(_rect, _cubeBackground)
+      ..drawRect(_rect, _cubeBorder..strokeWidth = 1.6 / viewport.zoom);
+  }
+
   @override
   bool get needsPaint => _repaint;
 
@@ -26,13 +45,12 @@ class QuadPrimitiveObject extends GvPainter {
       lastPosition = event.position;
     } else if (event is PointerMoveEvent && _rect.contains(viewport.screenToWorld(event.position))) {
       move = true;
-      var worldDelta = (event.position - lastPosition) / viewport.zoom;
-      if (worldDelta.distance > 1.0) {
-        _rect = _rect.translate(worldDelta.dx, worldDelta.dy);
+      var delta = (event.position - lastPosition) / viewport.zoom;
+      if (delta.distance > 1.0) {
+        _rect = _rect.translate(delta.dx, delta.dy);
         lastPosition = event.position;
 
-        _cubePicture = null;
-        _repaint = true;
+        _markNeedRepaint();
         return true;
       }
       debugPrint('QuadPrimitiveObject::handleEvent::move ${_rect.contains(viewport.screenToWorld(event.position))}');
@@ -45,32 +63,14 @@ class QuadPrimitiveObject extends GvPainter {
 
   @override
   void paint(GVPainterContext context) {
-    _repaint = false;
-    final (:canvas, :viewport) = context.expanded;
+    final canvas = context.canvas;
 
     if (_cubePicture != null) {
       canvas.drawPicture(_cubePicture!);
-      return;
+    } else {
+      canvas.drawPicture(_cubePicture = drawObjectToPicture(_innerPaint));
+      debugPrint('QuadPrimitiveObject::paint');
+      _repaint = false;
     }
-
-    final recorder = ui.PictureRecorder();
-    final canvasInner = ui.Canvas(recorder);
-    final paint = ui.Paint()..color = Colors.grey.shade300.withAlpha(164);
-    canvasInner
-      ..drawRect(_rect, paint)
-      ..drawRect(
-        _rect,
-        paint
-          ..style = ui.PaintingStyle.stroke
-          ..strokeWidth = 1.6 / viewport.zoom
-          ..color = Colors.grey.shade400,
-      )
-      ..drawLine(ui.Offset(_rect.center.dx, _rect.top), ui.Offset(_rect.center.dx, _rect.bottom), paint)
-      ..drawLine(ui.Offset(_rect.center.dx, _rect.bottom), ui.Offset(_rect.center.dx - 8, _rect.bottom - 12), paint)
-      ..drawLine(ui.Offset(_rect.center.dx, _rect.bottom), ui.Offset(_rect.center.dx + 8, _rect.bottom - 12), paint);
-
-    _cubePicture = recorder.endRecording();
-    canvas.drawPicture(_cubePicture!);
-    debugPrint('QuadPrimitiveObject::paint');
   }
 }

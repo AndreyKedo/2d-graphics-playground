@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:graphics_playground/graphics_viewport/gv_painter.dart';
 import 'package:graphics_playground/graphics_viewport/painter_context.dart';
 
-class GridPainter extends GvPainter {
+class GridPainter extends GvPainterMixin {
   GridPainter();
 
   final gridPainter = Paint()

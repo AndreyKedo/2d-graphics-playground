@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:graphics_playground/graphics_viewport/gv_painter.dart';
 import 'package:graphics_playground/graphics_viewport/painter_context.dart';
 
-class AxisPainter extends GvPainter {
+class AxisPainter extends GvPainterMixin {
   AxisPainter();
 
   final dxAxisPainter = Paint()..color = Colors.red;

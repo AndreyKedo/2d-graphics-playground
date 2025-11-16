@@ -112,7 +112,6 @@ mixin GraphicsViewportCameraMixin on TickerRenderObject {
   @override
   void handleEvent(PointerEvent event, HitTestEntry entry) {
     if (event is PointerHoverEvent) return;
-    // Пока просто выводим информацию о событии
     //debugPrint('Pointer event: ${event.runtimeType} at ${event.position}');
 
     if (event is PointerDownEvent) {

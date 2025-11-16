@@ -6,7 +6,7 @@ import 'package:graphics_playground/core/canvas_extension.dart';
 import 'package:graphics_playground/graphics_viewport/gv_painter.dart';
 import 'package:graphics_playground/graphics_viewport/painter_context.dart';
 
-class EditorMetricsPainter extends GvPainter {
+class EditorMetricsPainter extends GvPainterMixin {
   EditorMetricsPainter();
 
   final _layer = LayerHandle<PictureLayer>();
