@@ -2,9 +2,10 @@ import 'dart:typed_data';
 import 'dart:ui' show PointMode;
 
 import 'package:flutter/material.dart';
-import 'package:graphics_playground/graphics_viewport/gv_painter.dart';
-import 'package:graphics_playground/graphics_viewport/painter_context.dart';
+import 'package:graphics_playground/core/gv_painter.dart';
+import 'package:graphics_playground/core/painter_context.dart';
 
+/// Рисует направляющие оси относительно центра мира
 class AxisPainter extends GvPainterMixin {
   AxisPainter();
 

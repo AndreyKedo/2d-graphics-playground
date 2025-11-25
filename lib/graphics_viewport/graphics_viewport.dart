@@ -1,72 +1,41 @@
-import 'dart:ui';
-
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart';
-import 'package:flutter/services.dart';
-import 'package:graphics_playground/core/canvas_extension.dart';
-import 'package:graphics_playground/graphics_viewport/develop/editor_metrics_painter.dart';
-import 'package:graphics_playground/graphics_viewport/editor/axis_painter.dart';
-import 'package:graphics_playground/graphics_viewport/develop/performance_overlay_painter.dart';
-import 'package:graphics_playground/graphics_viewport/gesture.dart';
-import 'package:graphics_playground/graphics_viewport/editor/grid_painter.dart';
-import 'package:graphics_playground/graphics_viewport/gv_painter.dart';
-import 'package:graphics_playground/graphics_viewport/painter_context.dart';
-import 'package:graphics_playground/graphics_viewport/viewport.dart';
-
-abstract interface class GraphicsViewportContext {
-  Viewport2D get viewport;
-
-  Size get size;
-}
-
-class GraphicsViewportController {
-  WeakReference<GraphicsViewportRenderObject>? _renderObject;
-
-  @pragma('vm:prefer-inline')
-  void _useObject(void Function(GraphicsViewportRenderObject object) callback) {
-    if (_renderObject?.target case GraphicsViewportRenderObject object) {
-      callback(object);
-    }
-  }
-
-  void centerViewport() {
-    _useObject((object) {
-      final viewport = object.viewport;
-      viewport.reset();
-      object.lastDragPosition = object.size.center(Offset.zero);
-    });
-  }
-
-  void dispose() {
-    _renderObject = null;
-  }
-}
+import 'package:graphics_playground/core/develop/editor_metrics_painter.dart';
+import 'package:graphics_playground/core/develop/performance_overlay_painter.dart';
+import 'package:graphics_playground/core/editor/editor_painter.dart';
+import 'package:graphics_playground/core/gv_painter.dart';
+import 'package:graphics_playground/core/painter_context.dart';
+import 'package:graphics_playground/core/viewport.dart';
+import 'package:graphics_playground/core/viewport_context.dart';
 
 class GraphicsViewport extends LeafRenderObjectWidget {
   const GraphicsViewport({
     super.key,
-    required this.controller,
     this.painter,
     this.performanceOverlayOps = PerformanceOverlayOptionExtension.none,
+    this.showEditorMetrics = false,
   });
 
-  final GraphicsViewportController controller;
   final GvPainter? painter;
 
   final int performanceOverlayOps;
+  final bool showEditorMetrics;
 
   @override
   RenderObject createRenderObject(BuildContext context) {
-    return GraphicsViewportRenderObject(controller: controller, overlayOption: performanceOverlayOps, painter: painter);
+    return GraphicsViewportRenderObject(
+      overlayOption: performanceOverlayOps,
+      showEditorMetrics: showEditorMetrics,
+      painter: painter,
+    );
   }
 
   @override
   void updateRenderObject(BuildContext context, GraphicsViewportRenderObject renderObject) {
     renderObject
       ..overlayOption = performanceOverlayOps
-      ..controller = controller;
+      ..showEditorMetrics = showEditorMetrics;
 
     if (!identical(renderObject.painter, painter)) {
       renderObject.painter = painter;
@@ -82,7 +51,7 @@ abstract class TickerRenderObject extends RenderBox {
   @override
   void attach(PipelineOwner owner) {
     super.attach(owner);
-    _ticker = Ticker(onTick, debugLabel: 'GraphicsViewportRenderObject')..start();
+    _ticker = Ticker(onTick, debugLabel: 'GraphicsViewportRenderObject::Ticker')..start();
   }
 
   @mustCallSuper
@@ -96,56 +65,6 @@ abstract class TickerRenderObject extends RenderBox {
   }
 }
 
-mixin GraphicsViewportCameraMixin on TickerRenderObject {
-  final viewport = Viewport2D();
-
-  Gesture _gesture = Gesture.none;
-
-  bool _needsRebuild = false;
-
-  Offset _lastDragPosition = Offset.zero;
-  Offset get lastDragPosition => _lastDragPosition;
-  set lastDragPosition(Offset value) {
-    _lastDragPosition = value;
-  }
-
-  @override
-  void handleEvent(PointerEvent event, HitTestEntry entry) {
-    if (event is PointerHoverEvent) return;
-    //debugPrint('Pointer event: ${event.runtimeType} at ${event.position}');
-
-    if (event is PointerDownEvent) {
-      _gesture += Gesture.down;
-      lastDragPosition = event.position;
-    } else if (event is PointerMoveEvent) {
-      _gesture += Gesture.move;
-    } else if (event is PointerUpEvent) {
-      _gesture = Gesture.up;
-      lastDragPosition = Offset.zero;
-    } else if (event case PointerScrollEvent(kind: PointerDeviceKind.mouse)) {
-      _gesture = Gesture.scroll;
-    }
-
-    if (_gesture == Gesture.scroll) {
-      if (event is PointerScrollEvent) {
-        final factor = event.scrollDelta.dy.isNegative ? 1.2 : 0.9;
-        if (viewport.scale(factor, lastDragPosition = event.position)) {
-          _needsRebuild = true;
-        }
-        return;
-      }
-    }
-
-    var worldDelta = (event.position - lastDragPosition) / viewport.zoom;
-
-    if (_gesture.isMoving && worldDelta.distance > 1.0) {
-      viewport.translate(worldDelta);
-      lastDragPosition = event.position;
-      _needsRebuild = true;
-    }
-  }
-}
-
 mixin GraphicsViewportEventHandleMixin on TickerRenderObject {
   @override
   bool hitTestSelf(Offset position) => true;
@@ -155,23 +74,19 @@ mixin GraphicsViewportEventHandleMixin on TickerRenderObject {
 }
 
 class GraphicsViewportRenderObject extends TickerRenderObject
-    with GraphicsViewportEventHandleMixin, GraphicsViewportCameraMixin
+    with GraphicsViewportEventHandleMixin
     implements GraphicsViewportContext {
-  GraphicsViewportRenderObject({
-    required GraphicsViewportController controller,
-    required int overlayOption,
-    GvPainter? painter,
-  }) : _overlayOption = overlayOption,
-       _controller = controller,
-       _painter = painter {
-    controller._renderObject = WeakReference(this);
-  }
+  GraphicsViewportRenderObject({required int overlayOption, required bool showEditorMetrics, GvPainter? painter})
+    : _overlayOption = overlayOption,
+      _painter = painter,
+      _showEditorMetrics = showEditorMetrics;
 
-  final performanceOverlayPainter = PerformanceOverlayPainter();
+  @override
+  final viewport = Viewport2D();
 
-  final gridPainter = GridPainter();
-  final axisPainter = AxisPainter();
   final editorMetrics = EditorMetricsPainter();
+  final performanceOverlayPainter = PerformanceOverlayPainter();
+  final editorPainter = EditorPainter();
 
   GvPainter? _painter;
   GvPainter? get painter => _painter;
@@ -187,16 +102,16 @@ class GraphicsViewportRenderObject extends TickerRenderObject
     if (value == _overlayOption) return;
 
     _overlayOption = value;
+
     performanceOverlayPainter.overlayOption = _overlayOption;
   }
 
-  GraphicsViewportController _controller;
-  GraphicsViewportController get controller => _controller;
-  set controller(GraphicsViewportController value) {
-    if (value == _controller) return;
-    _controller._renderObject = null;
-    _controller = value;
-    controller._renderObject = WeakReference(this);
+  bool _showEditorMetrics;
+  bool get showEditorMetrics => _showEditorMetrics;
+  set showEditorMetrics(bool value) {
+    if (value == _showEditorMetrics) return;
+
+    _showEditorMetrics = value;
   }
 
   @override
@@ -204,6 +119,9 @@ class GraphicsViewportRenderObject extends TickerRenderObject
 
   @override
   bool get isRepaintBoundary => true;
+
+  @override
+  Object? get debugCreator => "GraphicsViewportRenderObject";
 
   @override
   Size computeDryLayout(covariant BoxConstraints constraints) {
@@ -222,7 +140,10 @@ class GraphicsViewportRenderObject extends TickerRenderObject
   @override
   void attach(PipelineOwner owner) {
     super.attach(owner);
-    _painter?.onAttached(this);
+    performanceOverlayPainter.onAttached(this);
+    editorMetrics.onAttached(this);
+    editorPainter.onAttached(this);
+    painter?.onAttached(this);
   }
 
   @override
@@ -232,11 +153,10 @@ class GraphicsViewportRenderObject extends TickerRenderObject
   }
 
   @override
-  void handleEvent(PointerEvent event, HitTestEntry entry) {
-    editorMetrics.position = _lastDragPosition;
-    if (_painter?.handleEvent(event, entry) ?? false) return;
-
+  void handleEvent(PointerEvent event, BoxHitTestEntry entry) {
     super.handleEvent(event, entry);
+    if (painter?.handleEvent(event, entry) ?? false) return;
+    editorPainter.handleEvent(event, entry);
   }
 
   @override
@@ -244,10 +164,16 @@ class GraphicsViewportRenderObject extends TickerRenderObject
     super.onTick(duration);
     if (!attached) return;
 
-    final needPaint = (_painter?.needsPaint ?? false) | _needsRebuild;
+    performanceOverlayPainter.onTick(duration);
+    editorMetrics.onTick(duration);
+    editorPainter.onTick(duration);
 
-    if (needPaint) {
-      _needsRebuild = false;
+    final innerEffectiveNeedPaint =
+        editorPainter.needsPaint | performanceOverlayPainter.needsPaint | editorMetrics.needsPaint;
+
+    painter?.onTick(duration);
+
+    if ((painter?.needsPaint ?? false) | innerEffectiveNeedPaint) {
       markNeedsPaint();
     }
   }
@@ -261,30 +187,27 @@ class GraphicsViewportRenderObject extends TickerRenderObject
       ..translate(offset.dx, offset.dy)
       ..clipRect(offset & size);
     viewport.applyTransformation(canvas);
-    canvas
-    // draw editor
-    .drawObject((canvas) {
-      gridPainter.paint(gvContext);
-      axisPainter.paint(gvContext);
-    });
 
-    if (_painter != null) {
-      _painter?.paint(gvContext);
+    // editor
+    editorPainter.paint(gvContext);
+
+    if (painter != null) {
+      painter?.paint(gvContext);
     }
 
     performanceOverlayPainter.paint(gvContext);
-    editorMetrics.paint(gvContext);
+    if (showEditorMetrics) {
+      editorMetrics.paint(gvContext);
+    }
     context.canvas.restore();
   }
 
   @override
   void detach() {
-    _painter?.onDetach();
+    painter?.onDetach();
     // editor
-    gridPainter.onDetach();
-    axisPainter.onDetach();
+    editorPainter.onDetach();
 
-    // metrics
     performanceOverlayPainter.onDetach();
     editorMetrics.onDetach();
     super.detach();

@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:graphics_playground/graphics_viewport/develop/performance_overlay_painter.dart';
+import 'package:graphics_playground/core/develop/performance_overlay_painter.dart';
 import 'package:graphics_playground/graphics_viewport/graphics_viewport.dart';
 import 'package:graphics_playground/graphics_viewport/primitive/quad_object.dart';
 
@@ -36,15 +36,7 @@ final class PlaygroundWidget extends StatefulWidget {
 
 /// State for widget PlaygroundWidget
 class _PlaygroundWidgetState extends State<PlaygroundWidget> {
-  final controller = GraphicsViewportController();
-
   final quadPrimitivePainter = QuadPrimitiveObject();
-
-  @override
-  void dispose() {
-    controller.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -63,8 +55,8 @@ class _PlaygroundWidgetState extends State<PlaygroundWidget> {
         ),
       ),
       body: GraphicsViewport(
-        controller: controller,
         painter: quadPrimitivePainter,
+        showEditorMetrics: true,
         performanceOverlayOps: kIsWeb ? PerformanceOverlayOptionExtension.none : PerformanceOverlayOptionExtension.all,
       ),
       floatingActionButton: Builder(
@@ -79,12 +71,6 @@ class _PlaygroundWidgetState extends State<PlaygroundWidget> {
                   if (Scaffold.hasDrawer(context)) {
                     Scaffold.of(context).openDrawer();
                   }
-                },
-              ),
-              FloatingActionButton.small(
-                child: Icon(Icons.center_focus_strong),
-                onPressed: () {
-                  controller.centerViewport();
                 },
               ),
             ],

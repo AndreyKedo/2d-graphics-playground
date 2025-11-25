@@ -4,8 +4,8 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart' show Colors;
 import 'package:graphics_playground/core/canvas_extension.dart';
-import 'package:graphics_playground/graphics_viewport/gv_painter.dart';
-import 'package:graphics_playground/graphics_viewport/painter_context.dart';
+import 'package:graphics_playground/core/gv_painter.dart';
+import 'package:graphics_playground/core/painter_context.dart';
 
 class QuadPrimitiveObject extends GvPainterMixin {
   QuadPrimitiveObject();
@@ -26,6 +26,7 @@ class QuadPrimitiveObject extends GvPainterMixin {
   bool _repaint = false;
 
   void _markNeedRepaint() {
+    _cubePicture?.dispose();
     _cubePicture = null;
     _repaint = true;
   }
@@ -41,19 +42,18 @@ class QuadPrimitiveObject extends GvPainterMixin {
 
   @override
   bool handleEvent(PointerEvent event, HitTestEntry<HitTestTarget> entry) {
+    if (!_rect.contains(viewport.screenToWorld(event.position))) return false;
+
     if (event is PointerDownEvent) {
       lastPosition = event.position;
-    } else if (event is PointerMoveEvent && _rect.contains(viewport.screenToWorld(event.position))) {
+    } else if (event is PointerMoveEvent) {
       move = true;
       var delta = (event.position - lastPosition) / viewport.zoom;
-      if (delta.distance > 1.0) {
-        _rect = _rect.translate(delta.dx, delta.dy);
-        lastPosition = event.position;
+      _rect = _rect.translate(delta.dx, delta.dy);
+      lastPosition = event.position;
 
-        _markNeedRepaint();
-        return true;
-      }
-      debugPrint('QuadPrimitiveObject::handleEvent::move ${_rect.contains(viewport.screenToWorld(event.position))}');
+      _markNeedRepaint();
+      return true;
     } else if (event is PointerUpEvent) {
       move = false;
     }
@@ -69,7 +69,6 @@ class QuadPrimitiveObject extends GvPainterMixin {
       canvas.drawPicture(_cubePicture!);
     } else {
       canvas.drawPicture(_cubePicture = drawObjectToPicture(_innerPaint));
-      debugPrint('QuadPrimitiveObject::paint');
       _repaint = false;
     }
   }
