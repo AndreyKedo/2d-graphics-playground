@@ -39,9 +39,7 @@ class GridPainter extends GvPainterMixin {
       path.lineTo(viewportRect.right, y);
     }
     path.close();
-    canvas
-      ..clipRect(viewportRect)
-      ..drawPath(path, paint);
+    canvas.drawPath(path, paint);
     _needsPaint = false;
   }
 

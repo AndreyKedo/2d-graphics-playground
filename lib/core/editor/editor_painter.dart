@@ -42,9 +42,8 @@ final class EditorPainter extends GvPainterMixin {
       }
     }
 
-    var worldDelta = (event.position - _lastDragPosition) / viewport.zoom;
-
     if (_gesture.isMoving) {
+      final worldDelta = (event.position - _lastDragPosition) / viewport.zoom;
       viewport.translate(worldDelta);
       _lastDragPosition = event.position;
       return true;

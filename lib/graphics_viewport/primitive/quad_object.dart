@@ -72,4 +72,12 @@ class QuadPrimitiveObject extends GvPainterMixin {
       _repaint = false;
     }
   }
+
+  @override
+  void onDetach() {
+    _repaint = false;
+    _cubePicture?.dispose();
+    _cubePicture = null;
+    super.onDetach();
+  }
 }

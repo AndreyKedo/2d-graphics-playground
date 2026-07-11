@@ -1,8 +1,12 @@
+import 'dart:typed_data';
+
 import 'package:flutter/rendering.dart';
+import 'package:graphics_playground/core/raw/raw_rect.dart';
 //import 'package:vector_math/vector_math_64.dart' show Vector3;
 
 class Viewport2D {
   //Matrix4 matrix = Matrix4.identity();
+  final _worldRect = Float64List(4);
   Size viewportSize = Size.zero;
   Offset _position = Offset.zero;
   double _scale = 1.0;
@@ -10,17 +14,9 @@ class Viewport2D {
   double get zoom => _scale;
   Offset get position => _position;
 
-  void updateProjection(Size size) {
-    viewportSize = size;
-  }
-
   void reset() {
     _position = Offset.zero;
     _scale = 1.0;
-  }
-
-  void setPosition(Offset position) {
-    _position = position;
   }
 
   void translate(Offset delta) {
@@ -50,19 +46,18 @@ class Viewport2D {
       ..scale(_scale, _scale)
       ..translate(_position.dx, _position.dy);
     //matrix = Matrix4.fromFloat64List(canvas.getTransform());
+    final rect = canvas.getLocalClipBounds();
+    _worldRect[0] = rect.left;
+    _worldRect[1] = rect.top;
+    _worldRect[2] = rect.right;
+    _worldRect[3] = rect.bottom;
   }
 
   @pragma('vm:prefer-inline')
-  double _constraintScale(double scale) {
-    return scale.clamp(0.1, 10.0);
-  }
+  double _constraintScale(double scale) => scale.clamp(0.1, 10.0);
 
   @pragma('vm:prefer-inline')
-  Rect getWorldRect() {
-    final topLeft = screenToWorld(Offset.zero);
-    final bottomRight = screenToWorld(Offset(viewportSize.width, viewportSize.height));
-    return Rect.fromPoints(topLeft, bottomRight);
-  }
+  RawRect getWorldRect() => RawRect(_worldRect);
 
   @pragma('vm:prefer-inline')
   Offset worldToScreen(Offset worldPoint) {

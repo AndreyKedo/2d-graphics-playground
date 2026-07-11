@@ -127,7 +127,7 @@ class GraphicsViewportRenderObject extends TickerRenderObject
   Size computeDryLayout(covariant BoxConstraints constraints) {
     final parentSize = constraints.biggest;
     // Update viewport
-    viewport.updateProjection(parentSize);
+    viewport.viewportSize = parentSize;
 
     // Overlay setup
     performanceOverlayPainter.overlayRect = Offset.zero & Size(parentSize.width, 200);
