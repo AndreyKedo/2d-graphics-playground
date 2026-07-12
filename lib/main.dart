@@ -1,8 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:graphics_playground/core/develop/performance_overlay_painter.dart';
-import 'package:graphics_playground/graphics_viewport/graphics_viewport.dart';
-import 'package:graphics_playground/graphics_viewport/primitive/quad_object.dart';
+import 'package:graphics_playground/core/graphics_viewport.dart';
+import 'package:graphics_playground/core/primitive/quad_object.dart';
 
 void main() {
   runApp(const MainApp());
@@ -54,10 +54,17 @@ class _PlaygroundWidgetState extends State<PlaygroundWidget> {
           ],
         ),
       ),
-      body: GraphicsViewport(
-        painter: quadPrimitivePainter,
-        showEditorMetrics: true,
-        performanceOverlayOps: kIsWeb ? PerformanceOverlayOptionExtension.none : PerformanceOverlayOptionExtension.all,
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints.tightFor(width: 800, height: 600),
+          child: GraphicsViewport(
+            painter: quadPrimitivePainter,
+            showEditorMetrics: true,
+            performanceOverlayOps: kIsWeb
+                ? PerformanceOverlayOptionExtension.none
+                : PerformanceOverlayOptionExtension.all,
+          ),
+        ),
       ),
       floatingActionButton: Builder(
         builder: (context) {

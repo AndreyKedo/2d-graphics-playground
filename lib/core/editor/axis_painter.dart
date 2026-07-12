@@ -26,7 +26,7 @@ class AxisPainter extends GvPainterMixin {
 
     if (!drawDxAxis && !drawDyAxis) return;
     final viewportRect = viewport.getWorldRect();
-    //print("Draw axis Y $drawDyAxis; Draw axis X $drawDxAxis; Draw cross axis ${drawDxAxis && drawDyAxis}");
+
     canvas.save();
     if (drawDxAxis) {
       canvas.drawRawPoints(

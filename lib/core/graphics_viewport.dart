@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:flutter/scheduler.dart';
 import 'package:graphics_playground/core/develop/editor_metrics_painter.dart';
 import 'package:graphics_playground/core/develop/performance_overlay_painter.dart';
 import 'package:graphics_playground/core/editor/editor_painter.dart';
+import 'package:graphics_playground/core/gesture/viewport_pointer_event.dart';
 import 'package:graphics_playground/core/gv_painter.dart';
 import 'package:graphics_playground/core/painter_context.dart';
-import 'package:graphics_playground/core/viewport.dart';
-import 'package:graphics_playground/core/viewport_context.dart';
+import 'package:graphics_playground/core/viewport/viewport.dart';
+import 'package:graphics_playground/core/viewport/viewport_context.dart';
 
 class GraphicsViewport extends LeafRenderObjectWidget {
   const GraphicsViewport({
@@ -45,37 +45,7 @@ class GraphicsViewport extends LeafRenderObjectWidget {
   }
 }
 
-abstract class TickerRenderObject extends RenderBox {
-  Ticker? _ticker;
-
-  @override
-  void attach(PipelineOwner owner) {
-    super.attach(owner);
-    _ticker = Ticker(onTick, debugLabel: 'GraphicsViewportRenderObject::Ticker')..start();
-  }
-
-  @mustCallSuper
-  void onTick(Duration duration) {}
-
-  @override
-  void detach() {
-    _ticker?.dispose();
-    _ticker = null;
-    super.detach();
-  }
-}
-
-mixin GraphicsViewportEventHandleMixin on TickerRenderObject {
-  @override
-  bool hitTestSelf(Offset position) => true;
-
-  @override
-  bool hitTestChildren(BoxHitTestResult result, {required Offset position}) => false;
-}
-
-class GraphicsViewportRenderObject extends TickerRenderObject
-    with GraphicsViewportEventHandleMixin
-    implements GraphicsViewportContext {
+class GraphicsViewportRenderObject extends RenderBox implements GraphicsViewportContext {
   GraphicsViewportRenderObject({required int overlayOption, required bool showEditorMetrics, GvPainter? painter})
     : _overlayOption = overlayOption,
       _painter = painter,
@@ -91,9 +61,20 @@ class GraphicsViewportRenderObject extends TickerRenderObject
   GvPainter? _painter;
   GvPainter? get painter => _painter;
   set painter(GvPainter? value) {
-    _painter?.onDetach();
-    value?.onAttached(this);
+    if (identical(value, painter)) return;
+
+    if (attached) {
+      _painter?.removeListener(markNeedsPaint);
+      _painter?.onDetach();
+    }
+
     _painter = value;
+
+    if (attached) {
+      _painter?.onAttached(this);
+      _painter?.addListener(markNeedsPaint);
+    }
+    markNeedsPaint();
   }
 
   int _overlayOption;
@@ -124,6 +105,12 @@ class GraphicsViewportRenderObject extends TickerRenderObject
   Object? get debugCreator => "GraphicsViewportRenderObject";
 
   @override
+  bool hitTestSelf(Offset position) => true;
+
+  @override
+  bool hitTestChildren(BoxHitTestResult result, {required Offset position}) => false;
+
+  @override
   Size computeDryLayout(covariant BoxConstraints constraints) {
     final parentSize = constraints.biggest;
     // Update viewport
@@ -140,10 +127,12 @@ class GraphicsViewportRenderObject extends TickerRenderObject
   @override
   void attach(PipelineOwner owner) {
     super.attach(owner);
+    viewport.addListener(markNeedsPaint);
     performanceOverlayPainter.onAttached(this);
     editorMetrics.onAttached(this);
     editorPainter.onAttached(this);
     painter?.onAttached(this);
+    painter?.addListener(markNeedsPaint);
   }
 
   @override
@@ -155,27 +144,18 @@ class GraphicsViewportRenderObject extends TickerRenderObject
   @override
   void handleEvent(PointerEvent event, BoxHitTestEntry entry) {
     super.handleEvent(event, entry);
-    if (painter?.handleEvent(event, entry) ?? false) return;
-    editorPainter.handleEvent(event, entry);
-  }
 
-  @override
-  void onTick(Duration duration) {
-    super.onTick(duration);
-    if (!attached) return;
+    final localPosition = event.localPosition;
+    final viewportEvent = ViewportPointerEvent(
+      origin: event,
+      screenPosition: localPosition,
+      worldPosition: viewport.screenToWorld(localPosition),
+      screenDelta: event.localDelta,
+      worldDelta: viewport.screenVectorToWorld(event.localDelta),
+    );
 
-    performanceOverlayPainter.onTick(duration);
-    editorMetrics.onTick(duration);
-    editorPainter.onTick(duration);
-
-    final innerEffectiveNeedPaint =
-        editorPainter.needsPaint | performanceOverlayPainter.needsPaint | editorMetrics.needsPaint;
-
-    painter?.onTick(duration);
-
-    if ((painter?.needsPaint ?? false) | innerEffectiveNeedPaint) {
-      markNeedsPaint();
-    }
+    if (painter?.handleEvent(viewportEvent, entry) ?? false) return;
+    editorPainter.handleEvent(viewportEvent, entry);
   }
 
   @override
@@ -185,7 +165,7 @@ class GraphicsViewportRenderObject extends TickerRenderObject
     canvas
       ..save()
       ..translate(offset.dx, offset.dy)
-      ..clipRect(offset & size);
+      ..clipRect(Offset.zero & size);
     viewport.applyTransformation(canvas);
 
     // editor
@@ -204,6 +184,8 @@ class GraphicsViewportRenderObject extends TickerRenderObject
 
   @override
   void detach() {
+    viewport.removeListener(markNeedsPaint);
+    painter?.removeListener(markNeedsPaint);
     painter?.onDetach();
     // editor
     editorPainter.onDetach();

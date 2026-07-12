@@ -1,9 +1,10 @@
 import 'package:flutter/gestures.dart';
-import 'package:graphics_playground/core/gesture.dart';
+import 'package:graphics_playground/core/gesture/gesture.dart';
+import 'package:graphics_playground/core/gesture/viewport_pointer_event.dart';
 import 'package:graphics_playground/core/gv_painter.dart';
 import 'package:graphics_playground/core/editor/axis_painter.dart';
 import 'package:graphics_playground/core/editor/grid_painter.dart';
-import 'package:graphics_playground/core/viewport_context.dart';
+import 'package:graphics_playground/core/viewport/viewport_context.dart';
 import 'package:graphics_playground/core/painter_context.dart';
 
 /// Отвечает за отрисовку деталей редактора таких как сетка, координатные оси
@@ -13,50 +14,35 @@ final class EditorPainter extends GvPainterMixin {
 
   Gesture _gesture = Gesture.none;
 
-  Offset _lastDragPosition = Offset.zero;
-
   @override
-  bool get needsPaint => gridPainter.needsPaint | axisPainter.needsPaint;
+  bool handleEvent(ViewportPointerEvent event, HitTestEntry entry) {
+    final originEvent = event.origin;
+    if (originEvent is PointerHoverEvent) return false;
 
-  @override
-  bool handleEvent(PointerEvent event, HitTestEntry entry) {
-    if (event is PointerHoverEvent) return false;
-
-    if (event is PointerDownEvent) {
+    if (originEvent is PointerDownEvent) {
       _gesture += Gesture.down;
-      _lastDragPosition = event.position;
-    } else if (event is PointerMoveEvent) {
+    } else if (originEvent is PointerMoveEvent) {
       _gesture += Gesture.move;
-    } else if (event is PointerUpEvent) {
+    } else if (originEvent is PointerUpEvent) {
       _gesture = Gesture.up;
-      _lastDragPosition = Offset.zero;
-    } else if (event case PointerScrollEvent(kind: PointerDeviceKind.mouse)) {
+    } else if (originEvent case PointerScrollEvent(kind: PointerDeviceKind.mouse)) {
       _gesture = Gesture.scroll;
     }
 
     if (_gesture == Gesture.scroll) {
-      if (event is PointerScrollEvent) {
-        final factor = event.scrollDelta.dy.isNegative ? 1.2 : 0.9;
-        viewport.scale(factor, _lastDragPosition = event.position);
+      if (originEvent is PointerScrollEvent) {
+        final factor = originEvent.scrollDelta.dy.isNegative ? 1.2 : 0.9;
+        viewport.scale(factor, event.screenPosition);
         return true;
       }
     }
 
-    if (_gesture.isMoving) {
-      final worldDelta = (event.position - _lastDragPosition) / viewport.zoom;
-      viewport.translate(worldDelta);
-      _lastDragPosition = event.position;
+    if (_gesture.isMoving && originEvent.buttons & kTertiaryButton > 0) {
+      viewport.translate(event.worldDelta);
       return true;
     }
 
     return false;
-  }
-
-  @override
-  void onTick(Duration delta) {
-    super.onTick(delta);
-    gridPainter.onTick(delta);
-    axisPainter.onTick(delta);
   }
 
   @override

@@ -23,10 +23,12 @@ class EditorMetricsPainter extends GvPainterMixin {
     final (:canvas, :viewport) = context.expanded;
 
     context.surfaceContext.pushLayer(_layer.layer ??= OffsetLayer(), (paintContext, _) {
+      final position = -viewport.position;
       final paragraph = buildTextParagraph(
         'Zoom: ${viewport.zoom.toStringAsFixed(2)}\n'
         'Offset: (${viewport.position.dx.toStringAsFixed(1)}, '
-        '${viewport.position.dy.toStringAsFixed(1)})\n',
+        '${viewport.position.dy.toStringAsFixed(1)})\n'
+        'Camera position: (${position.dx.toStringAsFixed(1)}, ${position.dy.toStringAsFixed(1)})',
       );
       paragraph.layout(ui.ParagraphConstraints(width: 200));
       paintContext.canvas.drawParagraph(paragraph, Offset(10, 10));

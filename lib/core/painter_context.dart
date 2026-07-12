@@ -1,5 +1,5 @@
 import 'package:flutter/rendering.dart' show Canvas, PaintingContext, Offset;
-import 'package:graphics_playground/core/viewport.dart';
+import 'package:graphics_playground/core/viewport/viewport.dart';
 import 'package:vector_math/vector_math_64.dart';
 
 class GVPainterContext {

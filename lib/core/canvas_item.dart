@@ -1,4 +1,5 @@
 import 'package:flutter/rendering.dart';
+import 'package:graphics_playground/core/gesture/viewport_pointer_event.dart';
 import 'package:graphics_playground/core/gv_painter.dart';
 import 'package:graphics_playground/core/painter_context.dart';
 
@@ -11,10 +12,7 @@ abstract class CanvasItem extends GvPainterMixin {
   Offset localPosition = Offset.zero;
 
   @override
-  bool get needsPaint => false;
-
-  @override
-  bool handleEvent(PointerEvent event, BoxHitTestEntry entry) {
+  bool handleEvent(ViewportPointerEvent event, BoxHitTestEntry entry) {
     return false;
   }
 

@@ -1,18 +1,16 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/rendering.dart';
-import 'package:graphics_playground/core/viewport_context.dart';
+import 'package:graphics_playground/core/gesture/viewport_pointer_event.dart';
+import 'package:graphics_playground/core/viewport/viewport_context.dart';
 import 'package:graphics_playground/core/painter_context.dart';
-import 'package:graphics_playground/core/viewport.dart';
+import 'package:graphics_playground/core/viewport/viewport.dart';
 import 'package:meta/meta.dart';
 
-abstract interface class GvPainter {
-  bool get needsPaint;
-
+abstract interface class GvPainter implements Listenable {
   @mustCallSuper
   void onAttached(GraphicsViewportContext context);
 
-  void onTick(Duration delta);
-
-  bool handleEvent(PointerEvent event, BoxHitTestEntry entry);
+  bool handleEvent(ViewportPointerEvent event, BoxHitTestEntry entry);
 
   @mustBeOverridden
   void paint(GVPainterContext context);
@@ -21,7 +19,7 @@ abstract interface class GvPainter {
   void onDetach() {}
 }
 
-abstract mixin class GvPainterMixin implements GvPainter {
+abstract class GvPainterMixin implements GvPainter {
   GvPainterMixin();
 
   GraphicsViewportContext? _context;
@@ -43,19 +41,13 @@ abstract mixin class GvPainterMixin implements GvPainter {
   }
 
   @override
-  void onTick(Duration delta) {}
-
-  @override
-  bool get needsPaint => false;
-
-  @override
   @mustCallSuper
   void onAttached(GraphicsViewportContext context) {
     _context = context;
   }
 
   @override
-  bool handleEvent(PointerEvent event, BoxHitTestEntry entry) {
+  bool handleEvent(ViewportPointerEvent event, BoxHitTestEntry entry) {
     return false;
   }
 
@@ -68,5 +60,15 @@ abstract mixin class GvPainterMixin implements GvPainter {
   @mustCallSuper
   void onDetach() {
     _context = null;
+  }
+
+  @override
+  void addListener(VoidCallback listener) {
+    // TODO: implement addListener
+  }
+
+  @override
+  void removeListener(VoidCallback listener) {
+    // TODO: implement removeListener
   }
 }

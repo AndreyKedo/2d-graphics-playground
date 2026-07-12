@@ -1,7 +1,7 @@
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
-import 'package:graphics_playground/core/canvas_extension.dart';
+import 'package:graphics_playground/core/foundation/canvas_extension.dart';
 import 'package:graphics_playground/core/gv_painter.dart';
 import 'package:graphics_playground/core/painter_context.dart';
 
@@ -16,7 +16,6 @@ class GridPainter extends GvPainterMixin {
   late Offset _lastCameraPosition = viewport.position;
   late double _lastZoom = viewport.zoom;
   ui.Picture? _picture;
-  bool _needsPaint = false;
 
   void innerPaint(Canvas canvas) {
     final paint = gridPainter..strokeWidth = 1.0 / viewport.zoom;
@@ -40,20 +39,17 @@ class GridPainter extends GvPainterMixin {
     }
     path.close();
     canvas.drawPath(path, paint);
-    _needsPaint = false;
   }
 
   void markNeedsPaint() {
-    _needsPaint = true;
     _picture?.dispose();
     _picture = null;
   }
 
   @override
-  bool get needsPaint => _needsPaint;
+  void paint(GVPainterContext context) {
+    final canvas = context.canvas;
 
-  @override
-  void onTick(Duration delta) {
     final sizeChanged = _viewportSize != viewport.viewportSize;
     final positionChanged = _lastCameraPosition != viewport.position;
     final zoomChanged = _lastZoom != viewport.zoom;
@@ -65,11 +61,6 @@ class GridPainter extends GvPainterMixin {
 
       markNeedsPaint();
     }
-  }
-
-  @override
-  void paint(GVPainterContext context) {
-    final canvas = context.canvas;
 
     canvas.drawPicture(_picture ??= drawObjectToPicture(innerPaint));
   }
