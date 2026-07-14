@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:graphics_playground/core/develop/editor_metrics_painter.dart';
 import 'package:graphics_playground/core/develop/performance_overlay_painter.dart';
 import 'package:graphics_playground/core/editor/editor_painter.dart';
 import 'package:graphics_playground/core/gesture/viewport_pointer_event.dart';
-import 'package:graphics_playground/core/gv_painter.dart';
+import 'package:graphics_playground/core/rendering/gv_painter.dart';
 import 'package:graphics_playground/core/painter_context.dart';
 import 'package:graphics_playground/core/viewport/viewport.dart';
 import 'package:graphics_playground/core/viewport/viewport_context.dart';
@@ -54,6 +55,9 @@ class GraphicsViewportRenderObject extends RenderBox implements GraphicsViewport
   @override
   final viewport = Viewport2D();
 
+  late final ticker = Ticker(onTick);
+  final pointers = <int>{};
+
   final editorMetrics = EditorMetricsPainter();
   final performanceOverlayPainter = PerformanceOverlayPainter();
   final editorPainter = EditorPainter();
@@ -64,7 +68,7 @@ class GraphicsViewportRenderObject extends RenderBox implements GraphicsViewport
     if (identical(value, painter)) return;
 
     if (attached) {
-      _painter?.removeListener(markNeedsPaint);
+      _painter?.removeListener(handleVisualChange);
       _painter?.onDetach();
     }
 
@@ -72,7 +76,7 @@ class GraphicsViewportRenderObject extends RenderBox implements GraphicsViewport
 
     if (attached) {
       _painter?.onAttached(this);
-      _painter?.addListener(markNeedsPaint);
+      _painter?.addListener(handleVisualChange);
     }
     markNeedsPaint();
   }
@@ -111,6 +115,9 @@ class GraphicsViewportRenderObject extends RenderBox implements GraphicsViewport
   bool hitTestChildren(BoxHitTestResult result, {required Offset position}) => false;
 
   @override
+  bool get alwaysNeedsCompositing => performanceOverlayPainter.overlayOption != PerformanceOverlayOptionExtension.none;
+
+  @override
   Size computeDryLayout(covariant BoxConstraints constraints) {
     final parentSize = constraints.biggest;
     // Update viewport
@@ -127,23 +134,25 @@ class GraphicsViewportRenderObject extends RenderBox implements GraphicsViewport
   @override
   void attach(PipelineOwner owner) {
     super.attach(owner);
-    viewport.addListener(markNeedsPaint);
     performanceOverlayPainter.onAttached(this);
     editorMetrics.onAttached(this);
     editorPainter.onAttached(this);
     painter?.onAttached(this);
-    painter?.addListener(markNeedsPaint);
+    painter?.addListener(handleVisualChange);
+    viewport.addListener(handleVisualChange);
   }
 
   @override
   void markNeedsPaint() {
-    debugPrint('GraphicsViewportRenderObject::markNeedsPaint');
+    //debugPrint('GraphicsViewportRenderObject::markNeedsPaint');
     super.markNeedsPaint();
   }
 
   @override
   void handleEvent(PointerEvent event, BoxHitTestEntry entry) {
-    super.handleEvent(event, entry);
+    if (event is PointerDownEvent) {
+      beginInteraction(event.pointer);
+    }
 
     final localPosition = event.localPosition;
     final viewportEvent = ViewportPointerEvent(
@@ -154,8 +163,48 @@ class GraphicsViewportRenderObject extends RenderBox implements GraphicsViewport
       worldDelta: viewport.screenVectorToWorld(event.localDelta),
     );
 
-    if (painter?.handleEvent(viewportEvent, entry) ?? false) return;
-    editorPainter.handleEvent(viewportEvent, entry);
+    final painterHandleEvent = painter?.handleEvent(viewportEvent, entry) ?? false;
+
+    if (!painterHandleEvent) {
+      editorPainter.handleEvent(viewportEvent, entry);
+    }
+
+    if (event is PointerUpEvent || event is PointerCancelEvent) {
+      endInteraction(event.pointer);
+    }
+    super.handleEvent(event, entry);
+  }
+
+  void beginInteraction(int pointer) {
+    final wasAdded = pointers.add(pointer);
+    if (!wasAdded) return;
+
+    if (pointers.isNotEmpty && !ticker.isActive) {
+      ticker.start();
+    }
+  }
+
+  void endInteraction(int pointer) {
+    final wasRemoved = pointers.remove(pointer);
+    if (!wasRemoved) return;
+
+    if (pointers.isEmpty && ticker.isActive) {
+      ticker.stop();
+      markNeedsPaint();
+    }
+  }
+
+  void handleVisualChange() {
+    if (ticker.isActive) {
+      return;
+    }
+    markNeedsPaint();
+  }
+
+  void onTick(Duration elapsed) {
+    if (attached) {
+      markNeedsPaint();
+    }
   }
 
   @override
@@ -184,8 +233,12 @@ class GraphicsViewportRenderObject extends RenderBox implements GraphicsViewport
 
   @override
   void detach() {
-    viewport.removeListener(markNeedsPaint);
-    painter?.removeListener(markNeedsPaint);
+    if (ticker.isActive) {
+      ticker.stop();
+    }
+
+    viewport.removeListener(handleVisualChange);
+    painter?.removeListener(handleVisualChange);
     painter?.onDetach();
     // editor
     editorPainter.onDetach();
@@ -193,5 +246,12 @@ class GraphicsViewportRenderObject extends RenderBox implements GraphicsViewport
     performanceOverlayPainter.onDetach();
     editorMetrics.onDetach();
     super.detach();
+  }
+
+  @override
+  void dispose() {
+    ticker.dispose();
+    viewport.dispose();
+    super.dispose();
   }
 }

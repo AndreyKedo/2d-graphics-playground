@@ -2,10 +2,10 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:graphics_playground/core/foundation/canvas_extension.dart';
-import 'package:graphics_playground/core/gv_painter.dart';
+import 'package:graphics_playground/core/rendering/gv_painter.dart';
 import 'package:graphics_playground/core/painter_context.dart';
 
-class GridPainter extends GvPainterMixin {
+class GridPainter extends GvPainterObject {
   GridPainter();
 
   final gridPainter = Paint()

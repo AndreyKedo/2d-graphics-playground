@@ -19,8 +19,8 @@ abstract interface class GvPainter implements Listenable {
   void onDetach() {}
 }
 
-abstract class GvPainterMixin implements GvPainter {
-  GvPainterMixin();
+abstract class GvPainterObject implements GvPainter {
+  GvPainterObject();
 
   GraphicsViewportContext? _context;
   GraphicsViewportContext get context {
@@ -63,12 +63,8 @@ abstract class GvPainterMixin implements GvPainter {
   }
 
   @override
-  void addListener(VoidCallback listener) {
-    // TODO: implement addListener
-  }
+  void addListener(VoidCallback listener) {}
 
   @override
-  void removeListener(VoidCallback listener) {
-    // TODO: implement removeListener
-  }
+  void removeListener(VoidCallback listener) {}
 }

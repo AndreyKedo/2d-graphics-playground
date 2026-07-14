@@ -16,3 +16,5 @@ extension type const Gesture._(int val) implements Object {
 
   Gesture operator +(Gesture other) => compose(other);
 }
+
+enum GvPointerEventResult { ignore, handle, capture }

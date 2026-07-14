@@ -1,14 +1,14 @@
 import 'package:flutter/gestures.dart';
 import 'package:graphics_playground/core/gesture/gesture.dart';
 import 'package:graphics_playground/core/gesture/viewport_pointer_event.dart';
-import 'package:graphics_playground/core/gv_painter.dart';
+import 'package:graphics_playground/core/rendering/gv_painter.dart';
 import 'package:graphics_playground/core/editor/axis_painter.dart';
 import 'package:graphics_playground/core/editor/grid_painter.dart';
 import 'package:graphics_playground/core/viewport/viewport_context.dart';
 import 'package:graphics_playground/core/painter_context.dart';
 
 /// Отвечает за отрисовку деталей редактора таких как сетка, координатные оси
-final class EditorPainter extends GvPainterMixin {
+final class EditorPainter extends GvPainterObject {
   final gridPainter = GridPainter();
   final axisPainter = AxisPainter();
 

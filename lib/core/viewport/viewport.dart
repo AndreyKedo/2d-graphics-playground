@@ -2,7 +2,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart' as foundation;
 import 'package:flutter/rendering.dart';
-import 'package:graphics_playground/core/raw/raw_rect.dart';
+import 'package:graphics_playground/core/foundation/raw_rect.dart';
 
 class Viewport2D with foundation.ChangeNotifier {
   final _worldRect = Float64List(4);

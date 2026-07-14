@@ -2,7 +2,7 @@
 
 🚧 **Work in progress**
 
-![preview](./doc/assets/preview.png)
+![preview](./docs/assets/preview.png)
 
 A simple 2D graphics playground written in Dart.
 

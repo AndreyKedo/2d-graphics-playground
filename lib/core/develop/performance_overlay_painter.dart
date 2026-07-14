@@ -1,9 +1,9 @@
 import 'package:flutter/rendering.dart';
-import 'package:graphics_playground/core/gv_painter.dart';
+import 'package:graphics_playground/core/rendering/gv_painter.dart';
 import 'package:graphics_playground/core/painter_context.dart';
 
 /// Отображает график производительности отрисовки
-class PerformanceOverlayPainter extends GvPainterMixin {
+class PerformanceOverlayPainter extends GvPainterObject {
   PerformanceOverlayPainter();
 
   int overlayOption = PerformanceOverlayOptionExtension.none;

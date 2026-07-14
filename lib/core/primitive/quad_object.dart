@@ -1,67 +1,100 @@
 import 'dart:ui' as ui;
 
-import 'package:flutter/rendering.dart';
 import 'package:flutter/gestures.dart';
-import 'package:flutter/material.dart' show Colors, ChangeNotifier;
+import 'package:flutter/rendering.dart';
+import 'package:flutter/material.dart' show Colors;
 import 'package:graphics_playground/core/foundation/canvas_extension.dart';
+import 'package:graphics_playground/core/gesture/gesture.dart';
 import 'package:graphics_playground/core/gesture/viewport_pointer_event.dart';
-import 'package:graphics_playground/core/gv_painter.dart';
-import 'package:graphics_playground/core/painter_context.dart';
+import 'package:graphics_playground/core/rendering/canvas_item.dart';
 
-class QuadPrimitiveObject extends GvPainterMixin with ChangeNotifier {
-  QuadPrimitiveObject();
+class QuadPrimitiveObject extends CanvasItem {
+  QuadPrimitiveObject({Color? backgroundColor, super.worldPosition})
+    : _cubeBackground = Paint()..color = backgroundColor ?? Colors.grey.shade300.withAlpha(164);
 
-  final _cubeBackground = Paint()..color = Colors.grey.shade300.withAlpha(164);
+  late final Paint _cubeBackground;
   final _cubeBorder = Paint()
     ..color = Colors.grey.shade300.withAlpha(164)
     ..style = ui.PaintingStyle.stroke
     ..color = Colors.grey.shade400;
 
-  ui.Picture? _cubePicture;
+  late final _localRect = Offset.zero & ui.Size(200, 200);
 
-  Rect _rect = Offset.zero & ui.Size(200, 200);
-
-  void _markNeedRepaint() {
-    _cubePicture?.dispose();
-    _cubePicture = null;
-
-    notifyListeners();
-  }
+  ui.Picture? _picture;
 
   void _innerPaint(ui.Canvas canvas) {
     canvas
-      ..drawRect(_rect, _cubeBackground)
-      ..drawRect(_rect, _cubeBorder..strokeWidth = 1.6 / viewport.zoom);
+      ..drawRect(_localRect, _cubeBackground)
+      ..drawRect(_localRect, _cubeBorder..strokeWidth = 1.6);
+  }
+
+  // @override
+  // bool hitTest(Offset point) {
+  //   final localPosition = event.worldPosition - _position;
+  //   final originEvent = event.origin;
+  //   final hitTest = _localRect.contains(localPosition);
+  //   if (!hitTest) return false;
+  //   if (originEvent is PointerMoveEvent && originEvent.buttons & kPrimaryMouseButton > 0) {
+  //     _position += event.worldDelta;
+  //     notifyListeners();
+  //     return true;
+  //   }
+
+  //   return false;
+  // }
+
+  @override
+  bool hitTestLocal(ui.Offset localPosition) {
+    return _localRect.contains(localPosition);
   }
 
   @override
-  bool handleEvent(ViewportPointerEvent event, HitTestEntry<HitTestTarget> entry) {
-    if (!_rect.contains(event.worldPosition)) return false;
-    final originEvent = event.origin;
+  GvPointerEventResult handlePointerEvent(ViewportPointerEvent event) {
+    final origin = event.origin;
 
-    if (originEvent is PointerMoveEvent && originEvent.buttons & kPrimaryMouseButton > 0) {
-      final delta = event.worldDelta;
-      _rect = _rect.translate(delta.dx, delta.dy);
+    final primaryPressed = origin.buttons & kPrimaryMouseButton > 0;
 
-      _markNeedRepaint();
-      return true;
+    if (origin is PointerDownEvent) {
+      if (primaryPressed) return .capture;
+      return .ignore;
     }
 
-    return false;
+    if (origin is PointerMoveEvent) {
+      translateWorld(event.worldDelta);
+      return .handle;
+    }
+
+    if (origin is PointerUpEvent || origin is PointerCancelEvent) {
+      return .handle;
+    }
+
+    return super.handlePointerEvent(event);
+  }
+
+  // @override
+  // bool handleEvent(ViewportPointerEvent event, HitTestEntry<HitTestTarget> entry) {
+  //   final localPosition = event.worldPosition - _position;
+  //   final originEvent = event.origin;
+  //   final hitTest = _localRect.contains(localPosition);
+  //   if (!hitTest) return false;
+  //   if (originEvent is PointerMoveEvent && originEvent.buttons & kPrimaryMouseButton > 0) {
+  //     _position += event.worldDelta;
+  //     notifyListeners();
+  //     return true;
+  //   }
+
+  //   return false;
+  // }
+
+  @override
+  void dispose() {
+    _picture?.dispose();
+    _picture = null;
+    super.dispose();
   }
 
   @override
-  void paint(GVPainterContext context) {
-    final canvas = context.canvas;
-
-    _cubePicture ??= drawObjectToPicture(_innerPaint);
-    canvas.drawPicture(_cubePicture!);
-  }
-
-  @override
-  void onDetach() {
-    _cubePicture?.dispose();
-    _cubePicture = null;
-    super.onDetach();
+  void draw(Canvas canvas) {
+    canvas.drawPicture(_picture ??= drawObjectToPicture(_innerPaint));
   }
 }

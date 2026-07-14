@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:graphics_playground/core/develop/performance_overlay_painter.dart';
 import 'package:graphics_playground/core/graphics_viewport.dart';
 import 'package:graphics_playground/core/primitive/quad_object.dart';
+import 'package:graphics_playground/core/rendering/gv_scene.dart';
 
 void main() {
   runApp(const MainApp());
@@ -36,7 +37,20 @@ final class PlaygroundWidget extends StatefulWidget {
 
 /// State for widget PlaygroundWidget
 class _PlaygroundWidgetState extends State<PlaygroundWidget> {
-  final quadPrimitivePainter = QuadPrimitiveObject();
+  final scene = GvScene(
+    children: [
+      QuadPrimitiveObject(worldPosition: Offset(16, 0)),
+      QuadPrimitiveObject(worldPosition: Offset(232, 0), backgroundColor: Colors.amberAccent),
+      QuadPrimitiveObject(worldPosition: Offset(16, 216), backgroundColor: Colors.cyan),
+      QuadPrimitiveObject(worldPosition: Offset(232, 216), backgroundColor: Colors.green),
+    ],
+  );
+
+  @override
+  void dispose() {
+    scene.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -58,7 +72,7 @@ class _PlaygroundWidgetState extends State<PlaygroundWidget> {
         child: ConstrainedBox(
           constraints: BoxConstraints.tightFor(width: 800, height: 600),
           child: GraphicsViewport(
-            painter: quadPrimitivePainter,
+            painter: scene,
             showEditorMetrics: true,
             performanceOverlayOps: kIsWeb
                 ? PerformanceOverlayOptionExtension.none

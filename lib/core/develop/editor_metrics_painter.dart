@@ -2,11 +2,11 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:graphics_playground/core/gv_painter.dart';
+import 'package:graphics_playground/core/rendering/gv_painter.dart';
 import 'package:graphics_playground/core/painter_context.dart';
 
 /// Отображает метрики о смещение мира и его масштабе
-class EditorMetricsPainter extends GvPainterMixin {
+class EditorMetricsPainter extends GvPainterObject {
   EditorMetricsPainter();
 
   final _layer = LayerHandle<OffsetLayer>();
