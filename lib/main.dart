@@ -17,7 +17,7 @@ class MainApp extends StatelessWidget {
     return MaterialApp(
       theme: ThemeData.from(
         colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.grey.shade300,
+          seedColor: Colors.green.shade300,
           dynamicSchemeVariant: DynamicSchemeVariant.content,
         ),
         useMaterial3: true,
@@ -37,14 +37,32 @@ final class PlaygroundWidget extends StatefulWidget {
 
 /// State for widget PlaygroundWidget
 class _PlaygroundWidgetState extends State<PlaygroundWidget> {
-  final scene = GvScene(
-    children: [
-      QuadPrimitiveObject(worldPosition: Offset(16, 0)),
-      QuadPrimitiveObject(worldPosition: Offset(232, 0), backgroundColor: Colors.amberAccent),
-      QuadPrimitiveObject(worldPosition: Offset(16, 216), backgroundColor: Colors.cyan),
-      QuadPrimitiveObject(worldPosition: Offset(232, 216), backgroundColor: Colors.green),
-    ],
-  );
+  final scene = GvScene();
+
+  bool initItemsAdd = true;
+
+  @override
+  void initState() {
+    super.initState();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    if (initItemsAdd) {
+      final theme = ColorScheme.of(context);
+
+      scene.bulkAddItems([
+        QuadPrimitiveObject(worldPosition: Offset(16, 0), backgroundColor: theme.primary),
+        QuadPrimitiveObject(worldPosition: Offset(232, 0), backgroundColor: theme.primaryContainer),
+        QuadPrimitiveObject(worldPosition: Offset(16, 216), backgroundColor: theme.secondaryContainer),
+        QuadPrimitiveObject(worldPosition: Offset(232, 216), backgroundColor: theme.tertiaryContainer),
+      ]);
+
+      initItemsAdd = false;
+    }
+  }
 
   @override
   void dispose() {
@@ -55,30 +73,36 @@ class _PlaygroundWidgetState extends State<PlaygroundWidget> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      drawer: Drawer(
-        child: GridView(
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2),
-          children: [
-            Card(
-              child: Padding(padding: const EdgeInsets.all(8.0), child: Placeholder()),
+      drawer: Builder(
+        builder: (context) {
+          return Drawer(
+            child: GridView(
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2),
+              children: [
+                GestureDetector(
+                  onTap: () {
+                    Scaffold.of(context).closeDrawer();
+                    scene.addItem(QuadPrimitiveObject(worldPosition: Offset(-100, -100), backgroundColor: Colors.blue));
+                  },
+                  child: Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: ColoredBox(color: Colors.blue),
+                    ),
+                  ),
+                ),
+                Card(
+                  child: Padding(padding: const EdgeInsets.all(8.0), child: Placeholder()),
+                ),
+              ],
             ),
-            Card(
-              child: Padding(padding: const EdgeInsets.all(8.0), child: Placeholder()),
-            ),
-          ],
-        ),
+          );
+        },
       ),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: BoxConstraints.tightFor(width: 800, height: 600),
-          child: GraphicsViewport(
-            painter: scene,
-            showEditorMetrics: true,
-            performanceOverlayOps: kIsWeb
-                ? PerformanceOverlayOptionExtension.none
-                : PerformanceOverlayOptionExtension.all,
-          ),
-        ),
+      body: GraphicsViewport(
+        painter: scene,
+        showEditorMetrics: true,
+        performanceOverlayOps: kIsWeb ? PerformanceOverlayOptionExtension.none : PerformanceOverlayOptionExtension.all,
       ),
       floatingActionButton: Builder(
         builder: (context) {

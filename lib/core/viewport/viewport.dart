@@ -5,7 +5,7 @@ import 'package:flutter/rendering.dart';
 import 'package:graphics_playground/core/foundation/raw_rect.dart';
 
 class Viewport2D with foundation.ChangeNotifier {
-  final _worldRect = Float64List(4);
+  final _worldRect = Float32List(4);
   Size viewportSize = Size.zero;
   Offset _position = Offset.zero;
   double _scale = 1.0;

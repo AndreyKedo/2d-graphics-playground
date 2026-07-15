@@ -3,9 +3,10 @@ import 'package:graphics_playground/core/gesture/gesture.dart';
 import 'package:graphics_playground/core/gesture/viewport_pointer_event.dart';
 import 'package:graphics_playground/core/painter_context.dart';
 import 'package:graphics_playground/core/rendering/gv_owner.dart';
+import 'package:graphics_playground/core/rendering/transform_gizmo.dart';
 import 'package:meta/meta.dart';
 
-abstract class CanvasItem {
+abstract class CanvasItem implements TransformGizmoTarget, GvPointerHandler {
   CanvasItem({Offset worldPosition = Offset.zero}) {
     _modelTransform.setTranslationRaw(worldPosition.dx, worldPosition.dy, 0);
   }
@@ -25,6 +26,20 @@ abstract class CanvasItem {
     return MatrixUtils.transformPoint(_modelTransform, Offset.zero);
   }
 
+  // MARK: manipulate
+  set worldPosition(Offset value) {
+    if (worldPosition == value) return;
+    _modelTransform.setTranslationRaw(value.dx, value.dy, 0);
+    markNeedsPaint();
+  }
+
+  void translateWorld(Offset delta) => worldPosition += delta;
+
+  @override
+  Offset localToWorld(Offset point) {
+    return MatrixUtils.transformPoint(_modelTransform, point);
+  }
+
   Offset worldToLocal(Offset worldPosition) {
     if (_inverseTransformDirty) {
       _inverseModelTransform
@@ -36,14 +51,17 @@ abstract class CanvasItem {
     return MatrixUtils.transformPoint(_inverseModelTransform, worldPosition);
   }
 
-  // MARK: manipulate
-  set worldPosition(Offset value) {
-    if (worldPosition == value) return;
-    _modelTransform.setTranslationRaw(value.dx, value.dy, 0);
-    markNeedsPaint();
+  @override
+  void copyTransformInto(Matrix4 result) {
+    result.setFrom(_modelTransform);
   }
 
-  void translateWorld(Offset delta) => worldPosition += delta;
+  @override
+  void setTransform(Matrix4 transform) {
+    _modelTransform.setFrom(transform);
+    _inverseTransformDirty = true;
+    markNeedsPaint();
+  }
 
   // MARK: Lifecycle
   @nonVirtual
@@ -76,6 +94,7 @@ abstract class CanvasItem {
   @mustBeOverridden
   void draw(Canvas canvas);
 
+  @override
   GvPointerEventResult handlePointerEvent(ViewportPointerEvent event) => .ignore;
 
   @protected
@@ -85,8 +104,8 @@ abstract class CanvasItem {
   @protected
   @nonVirtual
   void markNeedsPaint() {
-    _owner?.requestFrame();
     _inverseTransformDirty = true;
+    _owner?.requestFrame();
   }
 
   @nonVirtual

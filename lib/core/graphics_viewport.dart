@@ -47,10 +47,7 @@ class GraphicsViewport extends LeafRenderObjectWidget {
 }
 
 class GraphicsViewportRenderObject extends RenderBox implements GraphicsViewportContext {
-  GraphicsViewportRenderObject({required int overlayOption, required bool showEditorMetrics, GvPainter? painter})
-    : _overlayOption = overlayOption,
-      _painter = painter,
-      _showEditorMetrics = showEditorMetrics;
+  GraphicsViewportRenderObject({required this._overlayOption, required this._showEditorMetrics, this._painter});
 
   @override
   final viewport = Viewport2D();
@@ -150,10 +147,6 @@ class GraphicsViewportRenderObject extends RenderBox implements GraphicsViewport
 
   @override
   void handleEvent(PointerEvent event, BoxHitTestEntry entry) {
-    if (event is PointerDownEvent) {
-      beginInteraction(event.pointer);
-    }
-
     final localPosition = event.localPosition;
     final viewportEvent = ViewportPointerEvent(
       origin: event,
@@ -163,10 +156,16 @@ class GraphicsViewportRenderObject extends RenderBox implements GraphicsViewport
       worldDelta: viewport.screenVectorToWorld(event.localDelta),
     );
 
-    final painterHandleEvent = painter?.handleEvent(viewportEvent, entry) ?? false;
+    bool hasChange = false;
 
-    if (!painterHandleEvent) {
-      editorPainter.handleEvent(viewportEvent, entry);
+    hasChange |= painter?.handleEvent(viewportEvent, entry) ?? false;
+
+    if (!hasChange) {
+      hasChange |= editorPainter.handleEvent(viewportEvent, entry);
+    }
+
+    if (event is PointerDownEvent && hasChange) {
+      beginInteraction(event.pointer);
     }
 
     if (event is PointerUpEvent || event is PointerCancelEvent) {

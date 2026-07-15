@@ -15,14 +15,19 @@ class PreviewViewport extends StatefulWidget {
 }
 
 class _PreviewViewportState extends State<PreviewViewport> {
-  final scene = GvScene(
-    children: [
+  final scene = GvScene();
+
+  @override
+  void initState() {
+    super.initState();
+
+    scene.bulkAddItems([
       QuadPrimitiveObject(worldPosition: Offset(16, 0)),
       QuadPrimitiveObject(worldPosition: Offset(232, 0), backgroundColor: Colors.amberAccent),
       QuadPrimitiveObject(worldPosition: Offset(16, 216), backgroundColor: Colors.cyan),
       QuadPrimitiveObject(worldPosition: Offset(232, 216), backgroundColor: Colors.green),
-    ],
-  );
+    ]);
+  }
 
   @override
   void dispose() {

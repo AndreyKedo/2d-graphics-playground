@@ -1,3 +1,5 @@
+import 'package:graphics_playground/core/gesture/viewport_pointer_event.dart';
+
 extension type const Gesture._(int val) implements Object {
   static const Gesture none = Gesture._(0);
 
@@ -18,3 +20,7 @@ extension type const Gesture._(int val) implements Object {
 }
 
 enum GvPointerEventResult { ignore, handle, capture }
+
+abstract interface class GvPointerHandler {
+  GvPointerEventResult handlePointerEvent(ViewportPointerEvent event);
+}

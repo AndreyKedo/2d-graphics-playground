@@ -15,33 +15,18 @@ class QuadPrimitiveObject extends CanvasItem {
   late final Paint _cubeBackground;
   final _cubeBorder = Paint()
     ..color = Colors.grey.shade300.withAlpha(164)
-    ..style = ui.PaintingStyle.stroke
+    ..style = PaintingStyle.stroke
     ..color = Colors.grey.shade400;
 
-  late final _localRect = Offset.zero & ui.Size(200, 200);
+  late final _localRect = Offset.zero & Size(200, 200);
 
   ui.Picture? _picture;
 
-  void _innerPaint(ui.Canvas canvas) {
+  void _innerPaint(Canvas canvas) {
     canvas
       ..drawRect(_localRect, _cubeBackground)
       ..drawRect(_localRect, _cubeBorder..strokeWidth = 1.6);
   }
-
-  // @override
-  // bool hitTest(Offset point) {
-  //   final localPosition = event.worldPosition - _position;
-  //   final originEvent = event.origin;
-  //   final hitTest = _localRect.contains(localPosition);
-  //   if (!hitTest) return false;
-  //   if (originEvent is PointerMoveEvent && originEvent.buttons & kPrimaryMouseButton > 0) {
-  //     _position += event.worldDelta;
-  //     notifyListeners();
-  //     return true;
-  //   }
-
-  //   return false;
-  // }
 
   @override
   bool hitTestLocal(ui.Offset localPosition) {
@@ -71,21 +56,6 @@ class QuadPrimitiveObject extends CanvasItem {
     return super.handlePointerEvent(event);
   }
 
-  // @override
-  // bool handleEvent(ViewportPointerEvent event, HitTestEntry<HitTestTarget> entry) {
-  //   final localPosition = event.worldPosition - _position;
-  //   final originEvent = event.origin;
-  //   final hitTest = _localRect.contains(localPosition);
-  //   if (!hitTest) return false;
-  //   if (originEvent is PointerMoveEvent && originEvent.buttons & kPrimaryMouseButton > 0) {
-  //     _position += event.worldDelta;
-  //     notifyListeners();
-  //     return true;
-  //   }
-
-  //   return false;
-  // }
-
   @override
   void dispose() {
     _picture?.dispose();
@@ -97,4 +67,7 @@ class QuadPrimitiveObject extends CanvasItem {
   void draw(Canvas canvas) {
     canvas.drawPicture(_picture ??= drawObjectToPicture(_innerPaint));
   }
+
+  @override
+  Rect get localBounds => _localRect;
 }
