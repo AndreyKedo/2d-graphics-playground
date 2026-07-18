@@ -10,9 +10,7 @@ import 'package:graphics_playground/core/rendering/gv_painter.dart';
 import 'package:graphics_playground/core/rendering/transform_gizmo.dart';
 import 'package:graphics_playground/core/viewport/viewport_context.dart';
 
-class GvScene extends GvPainterObject with ChangeNotifier implements GvOwner {
-  GvScene();
-
+final class GvScene extends GvPainterObject with ChangeNotifier implements GvOwner {
   @protected
   final children = <CanvasItem>[];
 
@@ -32,12 +30,16 @@ class GvScene extends GvPainterObject with ChangeNotifier implements GvOwner {
   }
 
   void bulkAddItems(Iterable<CanvasItem> items) {
+    for (final item in items) {
+      if (attached) item.mount(this);
+    }
     children.addAll(items);
     requestFrame();
   }
 
   void addItem(CanvasItem item) {
     children.add(item);
+    if (attached) item.mount(this);
     requestFrame();
   }
 
@@ -92,9 +94,16 @@ class GvScene extends GvPainterObject with ChangeNotifier implements GvOwner {
     return true;
   }
 
+  @protected
+  bool viewFrustumCulling(CanvasItem item) {
+    final rect = viewport.getWorldRect();
+
+    return rect.overlaps(item.worldBounds);
+  }
+
   @override
   void paint(GVPainterContext context) {
-    for (final item in children) {
+    for (final item in children.where(viewFrustumCulling)) {
       item.paint(context);
     }
 
@@ -109,6 +118,7 @@ class GvScene extends GvPainterObject with ChangeNotifier implements GvOwner {
 
   @override
   void dispose() {
+    gizmo.onDetach();
     for (final item in children) {
       item.unmount(this);
       item.dispose();
@@ -118,7 +128,6 @@ class GvScene extends GvPainterObject with ChangeNotifier implements GvOwner {
   }
 
   @protected
-  @nonVirtual
   bool hitTestItem(ViewportPointerEvent event) {
     if (children.isEmpty) return false;
 

@@ -26,6 +26,11 @@ abstract class CanvasItem implements TransformGizmoTarget, GvPointerHandler {
     return MatrixUtils.transformPoint(_modelTransform, Offset.zero);
   }
 
+  @override
+  Rect get worldBounds {
+    return MatrixUtils.transformRect(_modelTransform, localBounds);
+  }
+
   // MARK: manipulate
   set worldPosition(Offset value) {
     if (worldPosition == value) return;

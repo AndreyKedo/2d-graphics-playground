@@ -3,7 +3,6 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:graphics_playground/core/gesture/gesture.dart';
 import 'package:graphics_playground/core/gesture/viewport_pointer_event.dart';
 import 'package:graphics_playground/core/painter_context.dart';
@@ -11,6 +10,8 @@ import 'package:graphics_playground/core/rendering/gv_painter.dart';
 
 abstract interface class TransformGizmoTarget {
   Rect get localBounds;
+
+  Rect get worldBounds;
 
   Offset localToWorld(Offset point);
 
@@ -44,11 +45,15 @@ final class TransformGizmo extends GvPainterObject implements GvPointerHandler {
     ..style = PaintingStyle.fill;
 
   int? _pointer;
-  Offset _pivotWorld = .zero;
-  Offset _renderPivotWorld = .zero;
+
+  // Положение якоря
+  Offset _pivotWorldPosition = .zero;
+
+  // Положение якоря для отрисовки
+  Offset _renderPivotWorldPosition = .zero;
+
   Offset _upperWorld = .zero;
   Offset _handleWorld = .zero;
-  Offset _handleScreen = .zero;
 
   double _lastAngle = 0;
   double _accumulatedAngle = 0;
@@ -66,15 +71,17 @@ final class TransformGizmo extends GvPainterObject implements GvPointerHandler {
 
       _updateGeometry();
 
-      if ((event.screenPosition - _handleScreen).distance > 10) {
+      // Рассчитывает расстояние между точкой касания и центром "ручки"
+      // Радиус ручки равен 8
+      if ((event.worldPosition - _handleWorld).distance > 10) {
         return .ignore;
       }
 
-      _pivotWorld = _renderPivotWorld;
+      _pivotWorldPosition = _renderPivotWorldPosition;
       _pointer = origin.pointer;
       item.copyTransformInto(_initialTransform);
 
-      _lastAngle = _angleAroundPivot(event.worldPosition, _pivotWorld);
+      _lastAngle = _angleAroundPivot(event.worldPosition, _pivotWorldPosition);
       _accumulatedAngle = 0;
 
       return .capture;
@@ -83,15 +90,15 @@ final class TransformGizmo extends GvPainterObject implements GvPointerHandler {
     if (origin.pointer != _pointer || item == null) return .ignore;
 
     if (origin is PointerMoveEvent) {
-      final angle = _angleAroundPivot(event.worldPosition, _pivotWorld);
+      final angle = _angleAroundPivot(event.worldPosition, _pivotWorldPosition);
       _accumulatedAngle += _normalize(angle - _lastAngle);
       _lastAngle = angle;
 
       _rotationTransform
         ..setIdentity()
-        ..translateByDouble(_pivotWorld.dx, _pivotWorld.dy, 0, 1)
+        ..translateByDouble(_pivotWorldPosition.dx, _pivotWorldPosition.dy, 0, 1)
         ..rotateZ(_accumulatedAngle)
-        ..translateByDouble(-_pivotWorld.dx, -_pivotWorld.dy, 0, 1);
+        ..translateByDouble(-_pivotWorldPosition.dx, -_pivotWorldPosition.dy, 0, 1);
 
       _resultTransform
         ..setFrom(_rotationTransform)
@@ -130,10 +137,10 @@ final class TransformGizmo extends GvPainterObject implements GvPointerHandler {
     final item = target!;
     final bounds = item.localBounds;
 
-    _renderPivotWorld = item.localToWorld(bounds.center);
+    _renderPivotWorldPosition = item.localToWorld(bounds.center);
     _upperWorld = item.localToWorld(bounds.bottomCenter);
 
-    final pivotScreen = viewport.worldToScreen(_renderPivotWorld);
+    final pivotScreen = viewport.worldToScreen(_renderPivotWorldPosition);
     final upperScreen = viewport.worldToScreen(_upperWorld);
 
     final vector = upperScreen - pivotScreen;
@@ -141,8 +148,7 @@ final class TransformGizmo extends GvPainterObject implements GvPointerHandler {
 
     final normalizedVector = vector / vector.distance;
 
-    _handleScreen = upperScreen + (normalizedVector * 30);
-    _handleWorld = viewport.screenToWorld(_handleScreen);
+    _handleWorld = viewport.screenToWorld(upperScreen + (normalizedVector * 30));
   }
 
   void _updateSelectionBounds(TransformGizmoTarget? target) {

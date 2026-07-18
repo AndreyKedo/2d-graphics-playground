@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:flutter/rendering.dart';
+import 'package:meta/meta.dart';
 
 extension type const RawRect(Float32List _raw) {
   factory RawRect.fromLTRB(double left, double top, double right, double bottom) {
@@ -13,9 +14,13 @@ extension type const RawRect(Float32List _raw) {
     return RawRect(storage);
   }
 
+  factory RawRect.view(RawRect value) {
+    return RawRectView(value.storage);
+  }
+
   static final zero = RawRect.fromLTRB(0, 0, 0, 0);
 
-  Float32List get storage => _raw;
+  Float32List get storage => Float32List.view(_raw.buffer);
 
   void setFrom(Rect rect) {
     _raw[0] = rect.left;
@@ -61,5 +66,36 @@ extension type const RawRect(Float32List _raw) {
 
   bool contains(Offset offset) {
     return offset.dx >= left && offset.dx < right && offset.dy >= top && offset.dy < bottom;
+  }
+
+  bool overlaps(Rect other) {
+    if (right <= other.left || other.right <= left) {
+      return false;
+    }
+    if (bottom <= other.top || other.bottom <= top) {
+      return false;
+    }
+    return true;
+  }
+}
+
+extension type RawRectView(Float32List _raw) implements RawRect {
+  @redeclare
+  void setFromPoints(Offset a, Offset b) {
+    _throwUnmodifiableException();
+  }
+
+  @redeclare
+  void setFromDouble(double left, double top, double right, double bottom) {
+    _throwUnmodifiableException();
+  }
+
+  @redeclare
+  void setFrom(Rect rect) {
+    _throwUnmodifiableException();
+  }
+
+  Never _throwUnmodifiableException() {
+    throw StateError('View is unmodifiable');
   }
 }

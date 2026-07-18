@@ -1,11 +1,9 @@
-import 'dart:typed_data';
-
 import 'package:flutter/foundation.dart' as foundation;
 import 'package:flutter/rendering.dart';
 import 'package:graphics_playground/core/foundation/raw_rect.dart';
 
 class Viewport2D with foundation.ChangeNotifier {
-  final _worldRect = Float32List(4);
+  final _worldRect = RawRect.zero;
   Size viewportSize = Size.zero;
   Offset _position = Offset.zero;
   double _scale = 1.0;
@@ -43,10 +41,7 @@ class Viewport2D with foundation.ChangeNotifier {
       ..scale(_scale, -_scale)
       ..translate(_position.dx, _position.dy);
     final rect = canvas.getLocalClipBounds();
-    _worldRect[0] = rect.left;
-    _worldRect[1] = rect.top;
-    _worldRect[2] = rect.right;
-    _worldRect[3] = rect.bottom;
+    _worldRect.setFrom(rect);
   }
 
   @pragma('vm:prefer-inline')
@@ -58,7 +53,7 @@ class Viewport2D with foundation.ChangeNotifier {
   double _constraintScale(double scale) => scale.clamp(0.1, 10.0);
 
   @pragma('vm:prefer-inline')
-  RawRect getWorldRect() => RawRect(_worldRect);
+  RawRect getWorldRect() => RawRect.view(_worldRect);
 
   @pragma('vm:prefer-inline')
   Offset worldToScreen(Offset worldPoint) {

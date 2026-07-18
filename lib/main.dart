@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:graphics_playground/core/develop/performance_overlay_painter.dart';
@@ -37,6 +39,9 @@ final class PlaygroundWidget extends StatefulWidget {
 
 /// State for widget PlaygroundWidget
 class _PlaygroundWidgetState extends State<PlaygroundWidget> {
+  static const _squareExtent = 200.0;
+  static const _squareGap = 16.0;
+
   final scene = GvScene();
 
   bool initItemsAdd = true;
@@ -70,31 +75,64 @@ class _PlaygroundWidgetState extends State<PlaygroundWidget> {
     super.dispose();
   }
 
+  void _addSquareGrid(int count, ColorScheme colors) {
+    final columns = math.sqrt(count).ceil();
+    final rows = (count / columns).ceil();
+    const stride = _squareExtent + _squareGap;
+    final origin = Offset(-(columns - 1) * stride / 2, -(rows - 1) * stride / 2);
+    final palette = <Color>[
+      colors.primary,
+      colors.primaryContainer,
+      colors.secondary,
+      colors.secondaryContainer,
+      colors.tertiary,
+      colors.tertiaryContainer,
+    ];
+
+    scene.bulkAddItems(
+      Iterable.generate(count, (index) {
+        final column = index % columns;
+        final row = index ~/ columns;
+
+        return QuadPrimitiveObject(
+          worldPosition: origin + Offset(column * stride, row * stride),
+          backgroundColor: palette[(row + column) % palette.length],
+        );
+      }),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       drawer: Builder(
         builder: (context) {
+          final colors = ColorScheme.of(context);
+
           return Drawer(
-            child: GridView(
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2),
-              children: [
-                GestureDetector(
-                  onTap: () {
-                    Scaffold.of(context).closeDrawer();
-                    scene.addItem(QuadPrimitiveObject(worldPosition: Offset(-100, -100), backgroundColor: Colors.blue));
-                  },
-                  child: Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: ColoredBox(color: Colors.blue),
-                    ),
+            child: SafeArea(
+              child: ListView(
+                padding: const EdgeInsets.all(16),
+                children: [
+                  Text('Добавить на сцену', style: Theme.of(context).textTheme.titleLarge),
+                  const SizedBox(height: 16),
+                  _SquareBatchTile(
+                    count: 1,
+                    color: colors.primary,
+                    onPressed: () {
+                      scene.addItem(
+                        QuadPrimitiveObject(worldPosition: const Offset(-100, -100), backgroundColor: colors.primary),
+                      );
+                    },
                   ),
-                ),
-                Card(
-                  child: Padding(padding: const EdgeInsets.all(8.0), child: Placeholder()),
-                ),
-              ],
+                  _SquareBatchTile(count: 1000, color: colors.secondary, onPressed: () => _addSquareGrid(1000, colors)),
+                  _SquareBatchTile(
+                    count: 10000,
+                    color: colors.tertiary,
+                    onPressed: () => _addSquareGrid(10000, colors),
+                  ),
+                ],
+              ),
             ),
           );
         },
@@ -120,6 +158,30 @@ class _PlaygroundWidgetState extends State<PlaygroundWidget> {
               ),
             ],
           );
+        },
+      ),
+    );
+  }
+}
+
+class _SquareBatchTile extends StatelessWidget {
+  const _SquareBatchTile({required this.count, required this.color, required this.onPressed});
+
+  final int count;
+  final Color color;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: ListTile(
+        leading: SizedBox.square(dimension: 32, child: ColoredBox(color: color)),
+        title: Text('$count ${count == 1 ? 'квадрат' : 'квадратов'}'),
+        subtitle: count == 1 ? null : const Text('Равномерная квадратная сетка'),
+        onTap: () {
+          Navigator.of(context).pop();
+          onPressed();
         },
       ),
     );
